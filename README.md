@@ -97,10 +97,16 @@ assured-test/
 ├── prisma/
 │   ├── schema.prisma
 │   └── seed.ts
+├── test/
+│   ├── setup.ts                   # happy-dom + jest-dom matchers
+│   └── fixtures/                  # makeProvider, makeWorkflow, ...
 ├── middleware.ts                  # protects (dashboard) + /api except auth
+├── bunfig.toml                    # preload test/setup.ts for `bun test`
 ├── .env.example
 └── README.md
 ```
+
+Tests are colocated next to source files as `*.test.ts` / `*.test.tsx` (e.g. `lib/billing.test.ts`, `components/dashboard/workflow-timeline.test.tsx`).
 
 File-size discipline: one concept per file, short focused functions, descriptive names.
 
@@ -375,14 +381,131 @@ middleware.ts  (runs on every request to /(dashboard) and protected /api)
     "db:migrate": "prisma migrate dev",
     "db:seed":    "bun run prisma/seed.ts",
     "db:studio":  "prisma studio",
-    "test":       "bun test"
+    "test":          "bun test",
+    "test:watch":    "bun test --watch",
+    "test:coverage": "bun test --coverage"
   }
 }
 ```
 
 ---
 
-## 12. Best practices applied
+## 12. Testing
+
+**Runner: Bun's native `bun test`.** Jest-compatible API (`describe`, `it`, `expect`, `mock`, `spyOn`), ~10× faster than Jest, zero transform config, and — crucially — it runs under the same runtime we ship with. No `ts-jest`, no `@swc/jest`, no ESM headaches.
+
+### 12.1 Setup
+
+```bash
+bun add -d @testing-library/react @testing-library/jest-dom @testing-library/user-event @happy-dom/global-registrator
+```
+
+`bunfig.toml` — preloads the DOM and matchers for every test file:
+
+```toml
+[test]
+preload = ["./test/setup.ts"]
+```
+
+`test/setup.ts`:
+
+```ts
+import { GlobalRegistrator } from "@happy-dom/global-registrator";
+import * as matchers from "@testing-library/jest-dom/matchers";
+import { expect } from "bun:test";
+
+GlobalRegistrator.register();
+expect.extend(matchers as any);
+```
+
+### 12.2 What gets tested at each layer
+
+| Layer | What to test | Example file |
+|---|---|---|
+| **Utils / libs** | Pure functions: pricing math, JWT sign/verify, date helpers. | `lib/billing.test.ts`, `lib/auth.test.ts` |
+| **Validators** | Zod schemas accept valid input, reject invalid. | `lib/validators.test.ts` |
+| **Temporal mock** | Returns expected canned shape per workflow type prefix. | `lib/temporal-mock.test.ts` |
+| **API Route Handlers** | Call `GET`/`POST` with a `Request`, assert status + JSON body. Prisma mocked via `mock.module`. | `app/api/providers/route.test.ts` |
+| **Components** | Render with RTL, assert DOM, simulate user events. | `components/dashboard/workflow-timeline.test.tsx` |
+| **Pages** | Render async Server Components; prefer extracting data-fetching into `lib/` and unit-testing that. | `app/(dashboard)/billing/page.test.tsx` |
+| **Middleware** | Feed `NextRequest` with/without session cookie; assert redirect vs pass-through. | `middleware.test.ts` |
+
+### 12.3 Examples
+
+**Util test** — `lib/billing.test.ts`:
+
+```ts
+import { describe, it, expect } from "bun:test";
+import { rollupUsage } from "@/lib/billing";
+
+describe("rollupUsage", () => {
+  it("sums events by type and applies platform fee", () => {
+    const result = rollupUsage({
+      platformFeeCents: 150_000,
+      events: [
+        { type: "CREDENTIALING", unitCents: 19_900 },
+        { type: "CREDENTIALING", unitCents: 19_900 },
+        { type: "LICENSE",       unitCents:  9_900 },
+      ],
+    });
+    expect(result.subtotalCents).toBe(49_700);
+    expect(result.totalCents).toBe(199_700);
+  });
+});
+```
+
+**Component test** — `components/dashboard/workflow-timeline.test.tsx`:
+
+```tsx
+import { describe, it, expect } from "bun:test";
+import { render, screen } from "@testing-library/react";
+import { WorkflowTimeline } from "./workflow-timeline";
+import { makeWorkflow } from "@/test/fixtures";
+
+describe("<WorkflowTimeline />", () => {
+  it("highlights the current step", () => {
+    render(<WorkflowTimeline workflow={makeWorkflow({ currentStep: "SANCTIONS_CHECK" })} />);
+    expect(screen.getByTestId("step-SANCTIONS_CHECK")).toHaveAttribute("data-current", "true");
+  });
+});
+```
+
+**Route Handler test** — `app/api/providers/route.test.ts`:
+
+```ts
+import { describe, it, expect, mock } from "bun:test";
+
+mock.module("@/lib/db", () => ({
+  prisma: { provider: { findMany: async () => [{ id: "p_1", name: "Dr. Who" }] } },
+}));
+
+const { GET } = await import("./route");
+
+describe("GET /api/providers", () => {
+  it("returns the provider list", async () => {
+    const res = await GET(new Request("http://t/api/providers"));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual([{ id: "p_1", name: "Dr. Who" }]);
+  });
+});
+```
+
+### 12.4 Mocking strategy
+
+- **Prisma** — `mock.module("@/lib/db", ...)` at the top of the test. Keeps tests hermetic; no real DB.
+- **fetch / network** — `spyOn(globalThis, "fetch")`.
+- **Fixtures** — builder functions in `test/fixtures/` (`makeProvider`, `makeWorkflow`, `makeInvoice`) to keep tests readable and resilient to schema changes.
+- **Server Component caveat** — React's official RSC testing story is still evolving. Prefer pushing data-fetching into `lib/` utilities and unit-testing those; keep page-level tests thin (smoke + a11y).
+
+### 12.5 Coverage & CI
+
+- Target: **80% for `lib/`**, **60% overall**.
+- `bun test --coverage` prints per-file coverage; CI fails if below threshold.
+- Runs on every PR; fast enough to not need sharding.
+
+---
+
+## 13. Best practices applied
 
 - **Server Components by default**, Client Components only where interaction requires (`"use client"`).
 - **Every Route Handler validates input with Zod** and returns typed JSON.
@@ -394,16 +517,16 @@ middleware.ts  (runs on every request to /(dashboard) and protected /api)
 
 ---
 
-## 13. Intentionally out of scope
+## 14. Intentionally out of scope
 
 - Real Temporal worker + activities.
 - Real Stripe / payment provider.
 - RBAC beyond a single role field.
 - File uploads (credentialing attachments).
 - HIPAA-grade audit logging, encryption-at-rest policy, BAA-ready infra.
-- End-to-end test suite (one unit test example is enough for the interview).
+- End-to-end tests with Playwright (unit + component tests are covered; e2e is a productionize step).
 
-## 14. Productionizing checklist
+## 15. Productionizing checklist
 
 - Wire real `@temporalio/client` in place of `lib/temporal-mock.ts`.
 - Wire Stripe metered billing in `lib/billing.ts`.
