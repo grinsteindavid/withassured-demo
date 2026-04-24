@@ -12,21 +12,21 @@ Read **[BUSINESS_MODEL.md](./BUSINESS_MODEL.md)** first for what Assured does, h
 
 ```
 ┌───────────────────────────────────────────────────────────────┐
-│                     Next.js 15 (Bun runtime)                  │
+│                     Next.js 16.2.4 (Bun runtime)              │
 │                                                               │
 │   React Server Components  ──▶  Route Handlers (/api/*)       │
 │           │                              │                    │
-│           │                              ├──▶ Prisma ──▶ Postgres + pgvector
+│           │                              ├──▶ Prisma ──▶ Postgres
 │           │                              │                    │
 │           │                              └──▶ Temporal client (ASSUMED, mocked in lib/temporal-mock.ts)
-│           │                                                    
+│           │                                 
 │           └──▶ middleware.ts (JWT cookie auth)                │
 └───────────────────────────────────────────────────────────────┘
 ```
 
 - **Frontend + backend in one repo** via the Next.js App Router.
 - **Temporal.io is assumed to exist** as a separate service. This scaffold does **not** run a worker. Instead, `lib/temporal-mock.ts` returns canned workflow state so the UI can render real-looking timelines. Swapping it for `@temporalio/client` is a single-file change.
-- **PostgreSQL + pgvector** stores providers, licenses, enrollments, compliance events, and billing data. The `pgvector` extension is wired up for future semantic search over credentialing documents.
+- **PostgreSQL** stores providers, licenses, enrollments, compliance events, and billing data.
 
 ---
 
@@ -34,13 +34,13 @@ Read **[BUSINESS_MODEL.md](./BUSINESS_MODEL.md)** first for what Assured does, h
 
 | Choice | Why |
 |---|---|
-| **Next.js 15 (App Router)** | Single codebase, Server Components for fast data fetches, Route Handlers for the API. Assured's own marketing site is Next.js-shaped. |
+| **Next.js 16.2.4 (App Router)** | Single codebase, Server Components for fast data fetches, Route Handlers for the API. Assured's own marketing site is Next.js-shaped. |
 | **Bun** | Fast installs, TS-native, single binary for runtime + package manager + test runner. |
 | **Prisma ORM** | Most common ORM at Series A — strong types, migrations, great DX, wide team familiarity. |
-| **PostgreSQL + pgvector** | Relational core + a vector column for embedding-based matching on provider documents and policies. |
+| **PostgreSQL** | Relational core for providers, licenses, enrollments, compliance events, and billing data. |
 | **JWT + HTTP-only cookie auth** | Hand-rolled, no third-party. Demonstrates fundamentals; easy to swap for Auth.js/Clerk later. |
 | **Temporal.io (assumed)** | Credentialing / enrollment are multi-day, retry-heavy, human-in-the-loop workflows — exactly Temporal's sweet spot. Not implemented here; mocked at the API boundary. |
-| **Tailwind + shadcn/ui + lucide-react** | Credible dashboard UI fast; accessible primitives. |
+| **Tailwind v4 + shadcn/ui + lucide-react** | Credible dashboard UI fast; accessible primitives. |
 | **Zod** | Input validation on every Route Handler and form. |
 | **bcryptjs + jose** | Password hashing + edge-compatible JWT signing/verification for `middleware.ts`. |
 
@@ -115,13 +115,12 @@ File-size discipline: one concept per file, short focused functions, descriptive
 ## 4. Prerequisites
 
 - **Bun ≥ 1.1** — `curl -fsSL https://bun.sh/install | bash`
-- **PostgreSQL 15+ with pgvector** — easiest via Docker:
+- **Node.js ≥20.9.0** — Next.js 16 requires this (use `nvm install 22 && nvm use 22`)
+- **PostgreSQL 15+** — via Homebrew:
   ```bash
-  docker run -d --name assured-pg \
-    -e POSTGRES_PASSWORD=postgres \
-    -e POSTGRES_DB=assured \
-    -p 5432:5432 \
-    pgvector/pgvector:pg16
+  brew install postgresql@16
+  brew services start postgresql@16
+  createdb assured
   ```
 - Node-compatible shell (macOS/Linux).
 
@@ -145,18 +144,19 @@ bunx shadcn@latest add button card table badge input label dialog dropdown-menu 
 # 4. Env
 cp .env.example .env
 # Fill in:
-#   DATABASE_URL="postgresql://postgres:postgres@localhost:5432/assured"
+#   DATABASE_URL="postgresql://looper@localhost:5432/assured"  # use your local user
 #   JWT_SECRET="change-me-32-bytes-min"
 #   TEMPORAL_ADDRESS="localhost:7233"   # documented but unused
 
 # 5. Database
 bunx prisma migrate dev --name init
-bunx prisma db execute --stdin <<< "CREATE EXTENSION IF NOT EXISTS vector;"
 bun run db:seed
 
 # 6. Dev server
 bun dev
 ```
+
+Note: `next.config.js` includes `allowedDevOrigins: ['127.0.0.1']` to enable browser preview access in development.
 
 Default seeded login: `admin@assured.test` / `password123`.
 
@@ -176,11 +176,9 @@ model Provider {
   specialty String
   status    ProviderStatus
   orgId     String
-  // future: embedding for semantic search
-  embedding Unsupported("vector(1536)")?
-  licenses          License[]
-  enrollments       PayerEnrollment[]
-  complianceChecks  ComplianceCheck[]
+  licenses  License[]
+  enrollments PayerEnrollment[]
+  complianceChecks ComplianceCheck[]
   credentialingCase CredentialingCase?
 }
 

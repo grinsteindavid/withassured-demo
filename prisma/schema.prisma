@@ -1,0 +1,154 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  MEMBER
+}
+
+enum ProviderStatus {
+  ACTIVE
+  INACTIVE
+  PENDING
+}
+
+enum LicenseStatus {
+  ACTIVE
+  EXPIRED
+  PENDING
+  REVOKED
+}
+
+enum EnrollmentStatus {
+  SUBMITTED
+  PENDING
+  APPROVED
+  DENIED
+}
+
+enum CaseStatus {
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
+enum UsageType {
+  CREDENTIALING
+  LICENSE
+  ENROLLMENT
+  MONITORING
+}
+
+enum InvoiceStatus {
+  OPEN
+  PAID
+  VOID
+}
+
+model Organization {
+  id   String @id @default(cuid())
+  name String
+  plan BillingPlan?
+  users User[]
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  role         Role     @default(MEMBER)
+  orgId        String
+  organization Organization @relation(fields: [orgId], references: [id])
+}
+
+model Provider {
+  id           String             @id @default(cuid())
+  npi          String             @unique
+  name         String
+  specialty    String
+  status       ProviderStatus
+  orgId        String
+  licenses          License[]
+  enrollments       PayerEnrollment[]
+  complianceChecks  ComplianceCheck[]
+  credentialingCase CredentialingCase?
+}
+
+model License {
+  id        String         @id @default(cuid())
+  providerId String
+  state     String
+  number    String
+  expiresAt DateTime
+  status    LicenseStatus
+  workflowId String?
+  provider  Provider @relation(fields: [providerId], references: [id])
+}
+
+model PayerEnrollment {
+  id         String           @id @default(cuid())
+  providerId String
+  payer      String
+  state      String
+  status     EnrollmentStatus
+  submittedAt DateTime?
+  workflowId String?
+  provider   Provider @relation(fields: [providerId], references: [id])
+}
+
+model ComplianceCheck {
+  id         String   @id @default(cuid())
+  providerId String
+  source     String
+  result     String
+  checkedAt  DateTime @default(now())
+  provider   Provider @relation(fields: [providerId], references: [id])
+}
+
+model CredentialingCase {
+  id         String     @id @default(cuid())
+  providerId String     @unique
+  workflowId String
+  status     CaseStatus
+  provider   Provider @relation(fields: [providerId], references: [id])
+}
+
+model BillingPlan {
+  id                     String @id @default(cuid())
+  orgId                  String @unique
+  platformFeeCents       Int
+  unitPriceCredentialing Int
+  unitPriceLicense       Int
+  unitPriceEnrollment    Int
+  unitPriceMonitoring    Int
+  organization           Organization @relation(fields: [orgId], references: [id])
+}
+
+model UsageEvent {
+  id         String     @id @default(cuid())
+  orgId      String
+  type       UsageType
+  providerId String?
+  unitCents  Int
+  occurredAt DateTime   @default(now())
+  invoiceId  String?
+  invoice    Invoice?   @relation(fields: [invoiceId], references: [id])
+}
+
+model Invoice {
+  id           String       @id @default(cuid())
+  orgId        String
+  periodStart  DateTime
+  periodEnd    DateTime
+  subtotalCents Int
+  totalCents   Int
+  status       InvoiceStatus @default(OPEN)
+  lineItems    Json
+  events       UsageEvent[]
+}
