@@ -3,32 +3,40 @@ import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
+const ORG_ID = "org_acme_health";
+const ADMIN_EMAIL = "admin@assured.test";
+
 async function main() {
+  // Idempotency gate — if the admin user already exists, exit clean.
+  // Re-running the seed becomes a no-op so it's safe to wire into container startup.
+  const existing = await prisma.user.findUnique({ where: { email: ADMIN_EMAIL } });
+  if (existing) {
+    console.log(`Seed already applied (${ADMIN_EMAIL} exists). Skipping.`);
+    return;
+  }
+
   const passwordHash = await bcrypt.hash("password123", 12);
 
-  const org = await prisma.organization.create({
+  await prisma.organization.create({
     data: {
+      id: ORG_ID,
       name: "Acme Health System",
-    },
-  });
-
-  await prisma.user.create({
-    data: {
-      email: "admin@assured.test",
-      passwordHash,
-      role: "ADMIN",
-      orgId: org.id,
-    },
-  });
-
-  await prisma.billingPlan.create({
-    data: {
-      orgId: org.id,
-      platformFeeCents: 150_000,
-      unitPriceCredentialing: 19_900,
-      unitPriceLicense: 9_900,
-      unitPriceEnrollment: 14_900,
-      unitPriceMonitoring: 2_900,
+      users: {
+        create: {
+          email: ADMIN_EMAIL,
+          passwordHash,
+          role: "ADMIN",
+        },
+      },
+      plan: {
+        create: {
+          platformFeeCents: 150_000,
+          unitPriceCredentialing: 19_900,
+          unitPriceLicense: 9_900,
+          unitPriceEnrollment: 14_900,
+          unitPriceMonitoring: 2_900,
+        },
+      },
     },
   });
 
@@ -38,7 +46,7 @@ async function main() {
       name: "Dr. Sarah Johnson",
       specialty: "Primary Care",
       status: "ACTIVE",
-      orgId: org.id,
+      orgId: ORG_ID,
     },
   });
 
@@ -48,7 +56,7 @@ async function main() {
       name: "Dr. Michael Chen",
       specialty: "Cardiology",
       status: "ACTIVE",
-      orgId: org.id,
+      orgId: ORG_ID,
     },
   });
 
@@ -67,7 +75,7 @@ async function main() {
         state: "NY",
         number: "MD67890",
         expiresAt: new Date("2025-06-30"),
-        status: "ACTIVE",
+        status: "EXPIRED",
         workflowId: "lic_02",
       },
     ],
@@ -96,55 +104,35 @@ async function main() {
 
   await prisma.complianceCheck.createMany({
     data: [
-      {
-        providerId: provider1.id,
-        source: "OIG",
-        result: "CLEAN",
-      },
-      {
-        providerId: provider2.id,
-        source: "SAM",
-        result: "CLEAN",
-      },
-      {
-        providerId: provider2.id,
-        source: "NPDB",
-        result: "FLAG",
-      },
+      { providerId: provider1.id, source: "OIG", result: "CLEAN" },
+      { providerId: provider2.id, source: "SAM", result: "CLEAN" },
+      { providerId: provider2.id, source: "NPDB", result: "FLAG" },
     ],
   });
 
   await prisma.credentialingCase.createMany({
     data: [
-      {
-        providerId: provider1.id,
-        workflowId: "cred_01",
-        status: "COMPLETED",
-      },
-      {
-        providerId: provider2.id,
-        workflowId: "cred_02",
-        status: "IN_PROGRESS",
-      },
+      { providerId: provider1.id, workflowId: "cred_01", status: "IN_PROGRESS" },
+      { providerId: provider2.id, workflowId: "cred_02", status: "IN_PROGRESS" },
     ],
   });
 
   await prisma.usageEvent.createMany({
     data: [
-      { orgId: org.id, type: "CREDENTIALING", providerId: provider1.id, unitCents: 19_900 },
-      { orgId: org.id, type: "CREDENTIALING", providerId: provider2.id, unitCents: 19_900 },
-      { orgId: org.id, type: "LICENSE", providerId: provider1.id, unitCents: 9_900 },
-      { orgId: org.id, type: "LICENSE", providerId: provider2.id, unitCents: 9_900 },
-      { orgId: org.id, type: "ENROLLMENT", providerId: provider1.id, unitCents: 14_900 },
-      { orgId: org.id, type: "ENROLLMENT", providerId: provider2.id, unitCents: 14_900 },
-      { orgId: org.id, type: "MONITORING", unitCents: 2_900 },
-      { orgId: org.id, type: "MONITORING", unitCents: 2_900 },
+      { orgId: ORG_ID, type: "CREDENTIALING", providerId: provider1.id, unitCents: 19_900 },
+      { orgId: ORG_ID, type: "CREDENTIALING", providerId: provider2.id, unitCents: 19_900 },
+      { orgId: ORG_ID, type: "LICENSE", providerId: provider1.id, unitCents: 9_900 },
+      { orgId: ORG_ID, type: "LICENSE", providerId: provider2.id, unitCents: 9_900 },
+      { orgId: ORG_ID, type: "ENROLLMENT", providerId: provider1.id, unitCents: 14_900 },
+      { orgId: ORG_ID, type: "ENROLLMENT", providerId: provider2.id, unitCents: 14_900 },
+      { orgId: ORG_ID, type: "MONITORING", unitCents: 2_900 },
+      { orgId: ORG_ID, type: "MONITORING", unitCents: 2_900 },
     ],
   });
 
   await prisma.invoice.create({
     data: {
-      orgId: org.id,
+      orgId: ORG_ID,
       periodStart: new Date("2026-03-01"),
       periodEnd: new Date("2026-03-31"),
       subtotalCents: 95_400,
@@ -154,7 +142,7 @@ async function main() {
     },
   });
 
-  console.log("Seed completed successfully!");
+  console.log("Seed completed successfully.");
 }
 
 main()

@@ -52,54 +52,72 @@ enum InvoiceStatus {
 }
 
 model Organization {
-  id   String @id @default(cuid())
-  name String
-  plan BillingPlan?
-  users User[]
+  id          String        @id @default(cuid())
+  name        String
+  plan        BillingPlan?
+  users       User[]
+  providers   Provider[]
+  usageEvents UsageEvent[]
+  invoices    Invoice[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
+  id           String       @id @default(cuid())
+  email        String       @unique
   passwordHash String
-  role         Role     @default(MEMBER)
+  role         Role         @default(MEMBER)
   orgId        String
-  organization Organization @relation(fields: [orgId], references: [id])
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
 }
 
 model Provider {
-  id           String             @id @default(cuid())
-  npi          String             @unique
-  name         String
-  specialty    String
-  status       ProviderStatus
-  orgId        String
+  id                String             @id @default(cuid())
+  npi               String             @unique
+  name              String
+  specialty         String
+  status            ProviderStatus
+  orgId             String
+  organization      Organization       @relation(fields: [orgId], references: [id], onDelete: Cascade)
   licenses          License[]
   enrollments       PayerEnrollment[]
   complianceChecks  ComplianceCheck[]
   credentialingCase CredentialingCase?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
 }
 
 model License {
-  id        String         @id @default(cuid())
+  id         String        @id @default(cuid())
   providerId String
-  state     String
-  number    String
-  expiresAt DateTime
-  status    LicenseStatus
+  state      String
+  number     String
+  expiresAt  DateTime
+  status     LicenseStatus
   workflowId String?
-  provider  Provider @relation(fields: [providerId], references: [id])
+  provider   Provider      @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  @@unique([state, number])
 }
 
 model PayerEnrollment {
-  id         String           @id @default(cuid())
-  providerId String
-  payer      String
-  state      String
-  status     EnrollmentStatus
+  id          String           @id @default(cuid())
+  providerId  String
+  payer       String
+  state       String
+  status      EnrollmentStatus
   submittedAt DateTime?
-  workflowId String?
-  provider   Provider @relation(fields: [providerId], references: [id])
+  workflowId  String?
+  provider    Provider         @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@unique([providerId, payer, state])
 }
 
 model ComplianceCheck {
@@ -108,47 +126,59 @@ model ComplianceCheck {
   source     String
   result     String
   checkedAt  DateTime @default(now())
-  provider   Provider @relation(fields: [providerId], references: [id])
+  provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }
 
 model CredentialingCase {
   id         String     @id @default(cuid())
   providerId String     @unique
-  workflowId String
+  workflowId String     @unique
   status     CaseStatus
-  provider   Provider @relation(fields: [providerId], references: [id])
+  provider   Provider   @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
 }
 
 model BillingPlan {
-  id                     String @id @default(cuid())
-  orgId                  String @unique
+  id                     String       @id @default(cuid())
+  orgId                  String       @unique
   platformFeeCents       Int
   unitPriceCredentialing Int
   unitPriceLicense       Int
   unitPriceEnrollment    Int
   unitPriceMonitoring    Int
-  organization           Organization @relation(fields: [orgId], references: [id])
+  organization           Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
 }
 
 model UsageEvent {
-  id         String     @id @default(cuid())
-  orgId      String
-  type       UsageType
-  providerId String?
-  unitCents  Int
-  occurredAt DateTime   @default(now())
-  invoiceId  String?
-  invoice    Invoice?   @relation(fields: [invoiceId], references: [id])
+  id           String       @id @default(cuid())
+  orgId        String
+  type         UsageType
+  providerId   String?
+  unitCents    Int
+  occurredAt   DateTime     @default(now())
+  invoiceId    String?
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  invoice      Invoice?     @relation(fields: [invoiceId], references: [id])
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
 }
 
 model Invoice {
-  id           String       @id @default(cuid())
-  orgId        String
-  periodStart  DateTime
-  periodEnd    DateTime
+  id            String        @id @default(cuid())
+  orgId         String
+  periodStart   DateTime
+  periodEnd     DateTime
   subtotalCents Int
-  totalCents   Int
-  status       InvoiceStatus @default(OPEN)
-  lineItems    Json
-  events       UsageEvent[]
+  totalCents    Int
+  status        InvoiceStatus @default(OPEN)
+  lineItems     Json
+  organization  Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  events        UsageEvent[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 }
