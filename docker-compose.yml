@@ -20,12 +20,18 @@ services:
       context: .
       dockerfile: Dockerfile
     environment:
+      NODE_ENV: development
       DATABASE_URL: postgresql://postgres:postgres@db:5432/assured
       JWT_SECRET: ${JWT_SECRET:-development-secret-32-bytes-minimum-change-in-production}
       TEMPORAL_ADDRESS: ${TEMPORAL_ADDRESS:-localhost:7233}
       E2E_USER_EMAIL: ${E2E_USER_EMAIL:-admin@assured.test}
       E2E_USER_PASSWORD: ${E2E_USER_PASSWORD:-password123}
       HOSTNAME: "0.0.0.0"
+      # macOS bind mounts don't fire inotify events — force polling so
+      # Next.js / Turbopack pick up host file changes inside the container.
+      WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
+      CHOKIDAR_INTERVAL: "500"
     ports:
       - "3000:3000"
     volumes:
@@ -38,7 +44,26 @@ services:
     command: >
       sh -c "bunx prisma generate &&
              bunx prisma migrate deploy &&
+             bun run db:seed &&
              bun run dev"
+
+  studio:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/assured
+    ports:
+      - "5555:5555"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -c "bunx prisma studio --port 5555 --hostname 0.0.0.0"
 
 volumes:
   postgres_data:
