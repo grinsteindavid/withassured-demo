@@ -25,7 +25,7 @@ describe("<AdvanceButton />", () => {
     render(<AdvanceButton workflowId="cred_42" />);
     await userEvent.click(screen.getByTestId("advance-button"));
 
-    expect(fetchSpy).toHaveBeenCalledWith("/api/_dev/workflows/cred_42/advance", { method: "POST" });
+    expect(fetchSpy).toHaveBeenCalledWith("/api/workflows/cred_42/advance", { method: "POST" });
     expect(refresh).toHaveBeenCalled();
 
     fetchSpy.mockRestore();

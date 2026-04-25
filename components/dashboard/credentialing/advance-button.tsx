@@ -14,7 +14,7 @@ export function AdvanceButton({ workflowId }: AdvanceButtonProps) {
   async function handleClick() {
     setBusy(true);
     try {
-      await fetch(`/api/_dev/workflows/${workflowId}/advance`, { method: "POST" });
+      await fetch(`/api/workflows/${workflowId}/advance`, { method: "POST" });
       router.refresh();
     } finally {
       setBusy(false);
