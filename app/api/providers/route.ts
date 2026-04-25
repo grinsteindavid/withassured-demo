@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { getProviders, createProvider } from "@/lib/providers";
 import { createProviderSchema } from "@/lib/validators";
 
 export async function GET() {
-  const providers = await prisma.provider.findMany();
+  const providers = await getProviders();
   return NextResponse.json(providers);
 }
 
@@ -15,9 +15,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
 
-  const provider = await prisma.provider.create({
-    data: result.data,
-  });
-
+  const provider = await createProvider(result.data);
   return NextResponse.json(provider, { status: 201 });
 }

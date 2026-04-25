@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
+import { prisma } from "@/lib/db";
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || "dev-secret");
 
@@ -43,4 +44,18 @@ export async function setSessionCookie(token: string): Promise<void> {
 export async function clearSessionCookie(): Promise<void> {
   const cookieStore = await cookies();
   cookieStore.delete("session");
+}
+
+export async function authenticateUser(
+  email: string,
+  password: string,
+): Promise<{ id: string; email: string; role: string; orgId: string } | null> {
+  const user = await prisma.user.findUnique({ where: { email } });
+
+  if (!user) return null;
+
+  const isValid = await verifyPassword(password, user.passwordHash);
+  if (!isValid) return null;
+
+  return { id: user.id, email: user.email, role: user.role, orgId: user.orgId };
 }

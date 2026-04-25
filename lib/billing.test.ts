@@ -1,11 +1,12 @@
 import { describe, it, expect, mock, beforeEach } from "bun:test";
-import { createInvoice, resetMockState } from "@/lib/stripe-mock";
+import { createInvoice, resetMockState, getSubscriptionItems } from "@/lib/stripe-mock";
 
 const usageFindMany = mock(async (_args: { where: Record<string, unknown> }) => [
   { type: "CREDENTIALING", unitCents: 19_900 },
   { type: "CREDENTIALING", unitCents: 19_900 },
   { type: "LICENSE", unitCents: 9_900 },
 ]);
+const usageEventCreate = mock(async ({ data }: { data: Record<string, unknown> }) => ({ id: "ue_1", ...data }));
 const invoiceFindMany = mock(async () => [
   {
     id: "db_inv_1",
@@ -18,15 +19,18 @@ const invoiceFindMany = mock(async () => [
     lineItems: [],
   },
 ]);
+const invoiceFindUnique = mock(async (_args: { where: { id: string } }) => null as unknown);
+const invoiceUpdate = mock(async (_args: { where: { id: string }; data: { status: string } }) => ({}));
+const invoiceUpdateMany = mock(async (_args: { where: { id: string }; data: { status: string } }) => ({ count: 1 }));
 
 mock.module("@/lib/db", () => ({
   prisma: {
-    usageEvent: { findMany: usageFindMany },
-    invoice: { findMany: invoiceFindMany },
+    usageEvent: { findMany: usageFindMany, create: usageEventCreate },
+    invoice: { findMany: invoiceFindMany, findUnique: invoiceFindUnique, update: invoiceUpdate, updateMany: invoiceUpdateMany },
   },
 }));
 
-const { rollupUsage, periodRange, getCurrentUsage, listAllInvoices } = await import("./billing");
+const { rollupUsage, periodRange, getCurrentUsage, listAllInvoices, recordUsageEvent, processInvoicePayment } = await import("./billing");
 
 beforeEach(() => {
   resetMockState();
@@ -115,5 +119,71 @@ describe("listAllInvoices", () => {
     const all = await listAllInvoices();
     const stripeRow = all.find((i) => i.id.startsWith("inv_mock_"))!;
     expect(stripeRow.status).toBe("OPEN");
+  });
+});
+
+describe("recordUsageEvent", () => {
+  it("creates a usage event with the right unitCents and emits a meter event", async () => {
+    usageEventCreate.mockClear();
+    const event = await recordUsageEvent("CREDENTIALING", "p_1");
+    expect(usageEventCreate).toHaveBeenCalledWith({
+      data: { orgId: "org_1", type: "CREDENTIALING", providerId: "p_1", unitCents: 19_900 },
+    });
+    expect(event.id).toBe("ue_1");
+    expect(getSubscriptionItems("org_1").credentialing).toBe(1);
+  });
+
+  it("uses the right unitCents per type", async () => {
+    const cases: Array<[string, number]> = [
+      ["LICENSE", 9_900],
+      ["ENROLLMENT", 14_900],
+      ["MONITORING", 2_900],
+    ];
+    for (const [type, expected] of cases) {
+      usageEventCreate.mockClear();
+      await recordUsageEvent(type as "LICENSE" | "ENROLLMENT" | "MONITORING");
+      const call = usageEventCreate.mock.calls[0][0] as { data: { unitCents: number } };
+      expect(call.data.unitCents).toBe(expected);
+    }
+  });
+});
+
+describe("processInvoicePayment", () => {
+  it("uses the stripe-mock path when the invoice exists in stripe-mock state", async () => {
+    const invoice = createInvoice({
+      customerId: "org_1",
+      lines: [{ description: "demo", amount: 1000, quantity: 1 }],
+      autoAdvance: true,
+    });
+
+    invoiceUpdateMany.mockClear();
+    const result = await processInvoicePayment(invoice.id);
+    expect(result.success).toBe(true);
+    expect(result.paymentIntentId).toBe(`pi_mock_${invoice.id}`);
+    expect(invoiceUpdateMany).toHaveBeenCalledWith({ where: { id: invoice.id }, data: { status: "PAID" } });
+  });
+
+  it("falls back to DB invoice when not in stripe-mock; marks PAID and returns success", async () => {
+    invoiceFindUnique.mockResolvedValueOnce({ id: "inv_db_1", status: "OPEN" });
+    invoiceUpdate.mockClear();
+
+    const result = await processInvoicePayment("inv_db_1");
+    expect(result.success).toBe(true);
+    expect(result.paymentIntentId).toBe("pi_inv_db_1");
+    expect(invoiceUpdate).toHaveBeenCalledWith({ where: { id: "inv_db_1" }, data: { status: "PAID" } });
+  });
+
+  it("returns error when invoice exists nowhere", async () => {
+    invoiceFindUnique.mockResolvedValueOnce(null);
+    const result = await processInvoicePayment("ghost");
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("Invoice not found");
+  });
+
+  it("returns error if DB invoice is already PAID", async () => {
+    invoiceFindUnique.mockResolvedValueOnce({ id: "inv_paid", status: "PAID" });
+    const result = await processInvoicePayment("inv_paid");
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("Already paid");
   });
 });

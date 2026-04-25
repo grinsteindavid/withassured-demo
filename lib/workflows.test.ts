@@ -1,21 +1,16 @@
 import { describe, it, expect, beforeEach } from "bun:test";
 import { controls } from "@/lib/temporal/client";
-import { GET } from "./route";
+import { getWorkflowState } from "./workflows";
 
 beforeEach(() => {
   controls.reset();
 });
 
-const callGet = (workflowId: string) =>
-  GET(new Request(`http://localhost/api/workflows/${workflowId}`), {
-    params: Promise.resolve({ workflowId }),
-  });
+const callGet = (workflowId: string) => getWorkflowState(workflowId);
 
-describe("GET /api/workflows/:workflowId", () => {
+describe("getWorkflowState", () => {
   it("returns the seeded workflow shape for a credentialing id", async () => {
-    const response = await callGet("cred_a");
-    expect(response.status).toBe(200);
-    const data = await response.json();
+    const data = await callGet("cred_a");
 
     expect(data.workflowId).toBe("cred_a");
     expect(data.type).toBe("credentialing");
@@ -35,15 +30,11 @@ describe("GET /api/workflows/:workflowId", () => {
     await callGet("cred_b"); // seed
     controls.advance("cred_b");
 
-    const response = await callGet("cred_b");
-    const data = await response.json();
+    const data = await callGet("cred_b");
     expect(data.currentStep).toBe("COMMITTEE_REVIEW");
   });
 
-  it("returns 404 for unknown workflow id prefix", async () => {
-    const response = await callGet("zzz_unknown");
-    expect(response.status).toBe(404);
-    const data = await response.json();
-    expect(data.error).toMatch(/Unknown workflow type/);
+  it("throws for unknown workflow id prefix", async () => {
+    await expect(callGet("zzz_unknown")).rejects.toThrow(/Unknown workflow type/);
   });
 });

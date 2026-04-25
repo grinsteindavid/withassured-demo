@@ -1,4 +1,4 @@
-import { describe, it, expect } from "bun:test";
+import { describe, it, expect, mock } from "bun:test";
 import { decodeJwt } from "jose";
 import { hashPassword, verifyPassword, signJWT, verifyJWT } from "./auth";
 
@@ -77,5 +77,47 @@ describe("verifyJWT", () => {
   it("returns null for malformed token", async () => {
     const result = await verifyJWT("not.a.jwt");
     expect(result).toBeNull();
+  });
+});
+
+import { authenticateUser } from "./auth";
+
+const findUnique = mock(async (_args: { where: { email: string } }) => null as unknown);
+
+mock.module("@/lib/db", () => ({
+  prisma: { user: { findUnique } },
+}));
+
+describe("authenticateUser", () => {
+  it("returns null for non-existent email", async () => {
+    findUnique.mockResolvedValueOnce(null);
+    const result = await authenticateUser("nobody@test.com", "password");
+    expect(result).toBeNull();
+  });
+
+  it("returns null for wrong password", async () => {
+    const passwordHash = await hashPassword("correctpass");
+    findUnique.mockResolvedValueOnce({
+      id: "u_1",
+      email: "test@test.com",
+      passwordHash,
+      role: "ADMIN",
+      orgId: "org_1",
+    });
+    const result = await authenticateUser("test@test.com", "wrongpass");
+    expect(result).toBeNull();
+  });
+
+  it("returns user on valid credentials", async () => {
+    const passwordHash = await hashPassword("correctpass");
+    findUnique.mockResolvedValueOnce({
+      id: "u_1",
+      email: "test@test.com",
+      passwordHash,
+      role: "ADMIN",
+      orgId: "org_1",
+    });
+    const result = await authenticateUser("test@test.com", "correctpass");
+    expect(result).toEqual({ id: "u_1", email: "test@test.com", role: "ADMIN", orgId: "org_1" });
   });
 });

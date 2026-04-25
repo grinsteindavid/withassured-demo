@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { listInvoices } from "@/lib/stripe-mock";
+import { listInvoices, payInvoice, createMeterEvent } from "@/lib/stripe-mock";
 
 export const PRICING = {
   platformFeeCents: 150_000,
@@ -82,4 +82,63 @@ export async function listAllInvoices(orgId = "org_1") {
   return [...dbInvoices, ...mockInvoices].sort(
     (a, b) => new Date(b.periodStart).getTime() - new Date(a.periodStart).getTime(),
   );
+}
+
+const VALID_TYPES = ["CREDENTIALING", "LICENSE", "ENROLLMENT", "MONITORING"] as const;
+
+export function isValidUsageType(type: string): type is (typeof VALID_TYPES)[number] {
+  return VALID_TYPES.includes(type as (typeof VALID_TYPES)[number]);
+}
+
+export async function recordUsageEvent(
+  type: (typeof VALID_TYPES)[number],
+  providerId?: string,
+  orgId = "org_1",
+) {
+  const unitCentsMap: Record<string, number> = {
+    CREDENTIALING: PRICING.unitPriceCredentialing,
+    LICENSE: PRICING.unitPriceLicense,
+    ENROLLMENT: PRICING.unitPriceEnrollment,
+    MONITORING: PRICING.unitPriceMonitoring,
+  };
+  const unitCents = unitCentsMap[type] || 0;
+
+  const event = await prisma.usageEvent.create({
+    data: {
+      orgId,
+      type: type as "CREDENTIALING" | "LICENSE" | "ENROLLMENT" | "MONITORING",
+      providerId,
+      unitCents,
+    },
+  });
+
+  createMeterEvent({
+    event_name: type.toLowerCase(),
+    customer: orgId,
+    value: 1,
+  });
+
+  return event;
+}
+
+export async function processInvoicePayment(id: string) {
+  const mockResult = payInvoice(id);
+  if (mockResult) {
+    await prisma.invoice.updateMany({
+      where: { id },
+      data: { status: "PAID" },
+    });
+    return { success: true, paymentIntentId: mockResult.paymentIntentId };
+  }
+
+  const dbInvoice = await prisma.invoice.findUnique({ where: { id } });
+  if (!dbInvoice) return { success: false, error: "Invoice not found" };
+  if (dbInvoice.status === "PAID") return { success: false, error: "Already paid" };
+
+  await prisma.invoice.update({
+    where: { id },
+    data: { status: "PAID" },
+  });
+
+  return { success: true, paymentIntentId: `pi_${id}` };
 }

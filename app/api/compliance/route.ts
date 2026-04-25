@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { getComplianceChecks } from "@/lib/compliance";
 import { complianceQuerySchema } from "@/lib/validators";
 
 export async function GET(request: Request) {
@@ -10,10 +10,6 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
 
-  const { providerId } = result.data;
-
-  const where = providerId ? { providerId } : {};
-
-  const checks = await prisma.complianceCheck.findMany({ where });
+  const checks = await getComplianceChecks(result.data.providerId);
   return NextResponse.json(checks);
 }
