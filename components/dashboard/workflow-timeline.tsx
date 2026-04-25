@@ -1,4 +1,4 @@
-import { WorkflowStep } from "@/lib/temporal-mock";
+import { WorkflowStep } from "@/lib/temporal/types";
 
 interface WorkflowTimelineProps {
   steps: WorkflowStep[];

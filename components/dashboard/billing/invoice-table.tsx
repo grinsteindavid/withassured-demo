@@ -1,4 +1,5 @@
 import { DataTable } from "../data-table";
+import { StatusBadge } from "../status-badge";
 
 interface InvoiceTableProps {
   invoices: Array<{
@@ -23,7 +24,9 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
           </td>
           <td className="px-4 py-2">${invoice.subtotalCents / 100}</td>
           <td className="px-4 py-2">${invoice.totalCents / 100}</td>
-          <td className="px-4 py-2">{invoice.status}</td>
+          <td className="px-4 py-2">
+            <StatusBadge status={invoice.status} />
+          </td>
         </tr>
       ))}
     </DataTable>

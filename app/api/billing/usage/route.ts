@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
-import { rollupUsage, PRICING } from "@/lib/billing";
+import { getCurrentUsage } from "@/lib/billing";
 import { billingUsageQuerySchema } from "@/lib/validators";
 
 export async function GET(request: Request) {
@@ -11,26 +10,6 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
 
-  const { period } = result.data;
-  const now = new Date();
-  const periodStart = period === "current" ? new Date(now.getFullYear(), now.getMonth(), 1) : new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const periodEnd = period === "current" ? new Date(now.getFullYear(), now.getMonth() + 1, 0) : new Date(now.getFullYear(), now.getMonth(), 0);
-
-  const events = await prisma.usageEvent.findMany({
-    where: {
-      occurredAt: { gte: periodStart, lte: periodEnd },
-      invoiceId: null,
-    },
-  });
-
-  const rollup = rollupUsage({
-    platformFeeCents: PRICING.platformFeeCents,
-    events: events.map((e) => ({ type: e.type, unitCents: e.unitCents })),
-  });
-
-  return NextResponse.json({
-    periodStart,
-    periodEnd,
-    ...rollup,
-  });
+  const usage = await getCurrentUsage(result.data.period);
+  return NextResponse.json(usage);
 }

@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { listAllInvoices } from "@/lib/billing";
 
 export async function GET() {
-  const invoices = await prisma.invoice.findMany();
-  return NextResponse.json(invoices);
+  return NextResponse.json(await listAllInvoices());
 }
