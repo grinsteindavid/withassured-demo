@@ -1,4 +1,5 @@
 import { describe, it, expect } from "bun:test";
+import { decodeJwt } from "jose";
 import { hashPassword, verifyPassword, signJWT, verifyJWT } from "./auth";
 
 describe("hashPassword", () => {
@@ -38,6 +39,21 @@ describe("signJWT", () => {
     expect(token).toBeDefined();
     expect(typeof token).toBe("string");
     expect(token.split(".")).toHaveLength(3); // JWT has 3 parts
+  });
+});
+
+describe("signJWT", () => {
+  it("expires in approximately 1 hour", async () => {
+    const payload = { sub: "user-123", orgId: "org-456", role: "ADMIN" };
+    const token = await signJWT(payload);
+    const decoded = decodeJwt(token);
+
+    expect(decoded.iat).toBeDefined();
+    expect(decoded.exp).toBeDefined();
+
+    const duration = (decoded.exp! - decoded.iat!);
+    expect(duration).toBeGreaterThanOrEqual(3590);
+    expect(duration).toBeLessThanOrEqual(3610);
   });
 });
 

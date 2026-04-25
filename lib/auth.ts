@@ -16,7 +16,7 @@ export async function signJWT(payload: { sub: string; orgId: string; role: strin
   return new SignJWT(payload)
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime("7d")
+    .setExpirationTime("1h")
     .sign(JWT_SECRET);
 }
 
@@ -36,7 +36,7 @@ export async function setSessionCookie(token: string): Promise<void> {
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
-    maxAge: 60 * 60 * 24 * 7, // 7 days
+    maxAge: 60 * 60, // 1 hour
   });
 }
 
