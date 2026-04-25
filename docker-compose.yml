@@ -1,0 +1,44 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: assured
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d assured"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/assured
+      JWT_SECRET: ${JWT_SECRET:-development-secret-32-bytes-minimum-change-in-production}
+      TEMPORAL_ADDRESS: ${TEMPORAL_ADDRESS:-localhost:7233}
+      E2E_USER_EMAIL: ${E2E_USER_EMAIL:-admin@assured.test}
+      E2E_USER_PASSWORD: ${E2E_USER_PASSWORD:-password123}
+      HOSTNAME: "0.0.0.0"
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -c "bunx prisma generate &&
+             bunx prisma migrate deploy &&
+             bun run dev"
+
+volumes:
+  postgres_data:
