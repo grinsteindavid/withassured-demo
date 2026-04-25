@@ -1,4 +1,5 @@
 import { WorkflowStep } from "@/lib/temporal/types";
+import { formatDateTime } from "@/lib/format";
 
 interface WorkflowTimelineProps {
   steps: WorkflowStep[];
@@ -27,7 +28,7 @@ export function WorkflowTimeline({ steps }: WorkflowTimelineProps) {
           </div>
           <div className="flex-1">
             <p className="font-medium">{step.name}</p>
-            {step.at && <p className="text-sm text-gray-500">{new Date(step.at).toLocaleString()}</p>}
+            {step.at && <p className="text-sm text-gray-500">{formatDateTime(step.at)}</p>}
           </div>
         </div>
       ))}

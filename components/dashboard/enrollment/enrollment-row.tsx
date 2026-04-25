@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { WorkflowTimeline } from "@/components/dashboard/workflow-timeline";
 import { StatusBadge } from "@/components/dashboard/status-badge";
+import { formatDate } from "@/lib/format";
 import type { WorkflowStep } from "@/lib/temporal/types";
 
 interface Enrollment {
@@ -57,9 +58,7 @@ export function EnrollmentRow({ enrollment, providerName }: EnrollmentRowProps) 
           <StatusBadge status={enrollment.status} />
         </td>
         <td className="px-4 py-2">
-          {enrollment.submittedAt
-            ? new Date(enrollment.submittedAt).toLocaleDateString()
-            : "—"}
+          {enrollment.submittedAt ? formatDate(enrollment.submittedAt) : "—"}
         </td>
         <td className="px-4 py-2">
           {enrollment.workflowId ? (

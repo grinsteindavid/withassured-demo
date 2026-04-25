@@ -2,6 +2,7 @@ import { listCredentialingCases, getCredentialingCaseDetail } from "@/lib/creden
 import { WorkflowTimeline } from "@/components/dashboard/workflow-timeline";
 import { StatusBadge } from "@/components/dashboard/status-badge";
 import { AdvanceButton } from "@/components/dashboard/credentialing/advance-button";
+import { formatDate } from "@/lib/format";
 
 interface CredentialingPageProps {
   searchParams: Promise<{ provider?: string }>;
@@ -59,8 +60,7 @@ export default async function CredentialingPage({ searchParams }: CredentialingP
                       {detail.specialty} · NPI {detail.npi}
                     </p>
                     <p className="mt-1 text-xs text-gray-500">
-                      Workflow {detail.workflowId} · started{" "}
-                      {new Date(detail.startTime).toLocaleDateString()}
+                      Workflow {detail.workflowId} · started {formatDate(detail.startTime)}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">

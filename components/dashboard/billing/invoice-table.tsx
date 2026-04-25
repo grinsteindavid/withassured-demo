@@ -1,5 +1,6 @@
 import { DataTable } from "../data-table";
 import { StatusBadge } from "../status-badge";
+import { formatDate } from "@/lib/format";
 
 interface InvoiceTableProps {
   invoices: Array<{
@@ -19,8 +20,7 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
         <tr key={invoice.id} className="border-b">
           <td className="px-4 py-2">{invoice.id}</td>
           <td className="px-4 py-2">
-            {new Date(invoice.periodStart).toLocaleDateString()} -{" "}
-            {new Date(invoice.periodEnd).toLocaleDateString()}
+            {formatDate(invoice.periodStart)} - {formatDate(invoice.periodEnd)}
           </td>
           <td className="px-4 py-2">${invoice.subtotalCents / 100}</td>
           <td className="px-4 py-2">${invoice.totalCents / 100}</td>
