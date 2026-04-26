@@ -1,18 +1,72 @@
 import { getSessionUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import { listProviders, getProviderDetail } from "@/lib/providers";
+import { ProviderFilters } from "@/components/dashboard/roster/provider-filters";
+import { ProviderRow } from "@/components/dashboard/roster/provider-row";
+import { ProviderDetail } from "@/components/dashboard/roster/provider-detail";
+import { DataTable } from "@/components/dashboard/data-table";
 
-export default async function RosterPage() {
+interface RosterPageProps {
+  searchParams: Promise<{ provider?: string; status?: string; specialty?: string; search?: string }>;
+}
+
+export default async function RosterPage({ searchParams }: RosterPageProps) {
   const user = await getSessionUser();
 
   if (!user) {
     redirect("/login");
   }
 
+  const { provider: selectedProviderId, status, specialty, search } = await searchParams;
+  const filters = {
+    status: status as "ACTIVE" | "INACTIVE" | "PENDING" | undefined,
+    specialty,
+    search,
+  };
+  const providers = await listProviders(user.orgId, filters);
+  const detail = selectedProviderId ? await getProviderDetail(selectedProviderId, user.orgId) : null;
+
   return (
     <div>
       <h1 className="mb-6 text-2xl font-bold">Provider Roster</h1>
-      <div className="rounded border p-4">
-        <p className="text-gray-600">Provider roster management will appear here.</p>
+
+      <div className="grid grid-cols-12 gap-6">
+        <aside className="col-span-12 md:col-span-5 lg:col-span-4">
+          <ProviderFilters
+            currentStatus={status}
+            currentSpecialty={specialty}
+            currentSearch={search}
+          />
+          {providers.length === 0 ? (
+            <div className="rounded border p-6 text-gray-600">
+              No providers found. Try adjusting your filters.
+            </div>
+          ) : (
+            <DataTable columns={["Name", "NPI", "Specialty", "Status", "Licenses", "Enrollments", "Compliance", "Added"]}>
+              {providers.map((provider) => (
+                <ProviderRow
+                  key={provider.id}
+                  provider={provider}
+                  status={status}
+                  specialty={specialty}
+                  search={search}
+                />
+              ))}
+            </DataTable>
+          )}
+        </aside>
+
+        {providers.length > 0 && (
+          <section className="col-span-12 md:col-span-7 lg:col-span-8">
+            {detail ? (
+              <ProviderDetail provider={detail} />
+            ) : (
+              <div className="rounded border p-6 text-gray-600">
+                Select a provider to view their details.
+              </div>
+            )}
+          </section>
+        )}
       </div>
     </div>
   );

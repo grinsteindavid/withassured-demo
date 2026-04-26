@@ -51,14 +51,14 @@ describe("createProviderSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it("rejects missing orgId", () => {
+  it("accepts missing orgId (added by API route)", () => {
     const result = createProviderSchema.safeParse({
       npi: "1234567890",
       name: "Dr. Test",
       specialty: "Cardiology",
       status: "ACTIVE",
     });
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
   });
 });
 

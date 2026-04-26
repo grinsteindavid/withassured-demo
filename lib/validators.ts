@@ -13,7 +13,7 @@ export const createProviderSchema = z.object({
   name: z.string().min(1),
   specialty: z.string().min(1),
   status: z.enum(["ACTIVE", "INACTIVE", "PENDING"]),
-  orgId: z.string(),
+  orgId: z.string().optional(),
 });
 
 export const licenseQuerySchema = z.object({
@@ -28,4 +28,10 @@ export const complianceQuerySchema = z.object({
 
 export const billingUsageQuerySchema = z.object({
   period: z.enum(["current", "previous"]).default("current"),
+});
+
+export const providerQuerySchema = z.object({
+  status: z.enum(["ACTIVE", "INACTIVE", "PENDING"]).optional(),
+  specialty: z.string().optional(),
+  search: z.string().optional(),
 });

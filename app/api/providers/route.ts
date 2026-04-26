@@ -1,13 +1,31 @@
 import { NextResponse } from "next/server";
-import { getProviders, createProvider } from "@/lib/providers";
-import { createProviderSchema } from "@/lib/validators";
+import { listProviders, createProvider } from "@/lib/providers";
+import { createProviderSchema, providerQuerySchema } from "@/lib/validators";
+import { getSessionUser } from "@/lib/auth";
 
-export async function GET() {
-  const providers = await getProviders();
+export async function GET(request: Request) {
+  const user = await getSessionUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const result = providerQuerySchema.safeParse(Object.fromEntries(searchParams));
+
+  if (!result.success) {
+    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+  }
+
+  const providers = await listProviders(user.orgId, result.data);
   return NextResponse.json(providers);
 }
 
 export async function POST(request: Request) {
+  const user = await getSessionUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const body = await request.json();
   const result = createProviderSchema.safeParse(body);
 
@@ -15,6 +33,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
 
-  const provider = await createProvider(result.data);
+  const provider = await createProvider({ ...result.data, orgId: user.orgId });
   return NextResponse.json(provider, { status: 201 });
 }
