@@ -3,6 +3,10 @@ import { describe, it, expect, mock } from "bun:test";
 const push = mock(() => {});
 
 mock.module("next/navigation", () => ({
+  default: {
+    useRouter: () => ({ push }),
+    useSearchParams: () => new URLSearchParams(),
+  },
   useRouter: () => ({ push }),
   useSearchParams: () => new URLSearchParams(),
 }));

@@ -42,7 +42,8 @@ services:
       db:
         condition: service_healthy
     command: >
-      sh -c "bunx prisma generate &&
+      sh -c "rm -rf .next &&
+             bunx prisma generate &&
              bunx prisma migrate deploy &&
              bun run db:seed &&
              bun run dev"
@@ -63,7 +64,7 @@ services:
       db:
         condition: service_healthy
     command: >
-      sh -c "bunx prisma studio --port 5555 --hostname 0.0.0.0"
+      sh -c "bunx prisma generate && bunx prisma studio --port 5555 --hostname 0.0.0.0"
 
 volumes:
   postgres_data:
