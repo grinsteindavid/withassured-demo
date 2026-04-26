@@ -37,19 +37,19 @@ export default async function DashboardOverview() {
     <div>
       <h1 data-testid="dashboard-heading" className="mb-6 text-2xl font-bold">Dashboard Overview</h1>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-        <div className="rounded border p-4">
+        <div className="rounded border p-4" data-testid="metric-total-providers">
           <h3 className="text-sm font-medium text-gray-500">Total Providers</h3>
           <p className="text-2xl font-bold">{totalProviders}</p>
         </div>
-        <div className="rounded border p-4">
+        <div className="rounded border p-4" data-testid="metric-active-credentials">
           <h3 className="text-sm font-medium text-gray-500">Active Credentials</h3>
           <p className="text-2xl font-bold">{activeCredentials}</p>
         </div>
-        <div className="rounded border p-4">
+        <div className="rounded border p-4" data-testid="metric-pending-enrollments">
           <h3 className="text-sm font-medium text-gray-500">Pending Enrollments</h3>
           <p className="text-2xl font-bold">{pendingEnrollments}</p>
         </div>
-        <div className="rounded border p-4">
+        <div className="rounded border p-4" data-testid="metric-compliance-alerts">
           <h3 className="text-sm font-medium text-gray-500">Compliance Alerts</h3>
           <p className="text-2xl font-bold">{complianceAlerts}</p>
         </div>

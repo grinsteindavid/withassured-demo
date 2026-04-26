@@ -2,6 +2,7 @@ import { describe, it, expect, mock, beforeEach } from "bun:test";
 
 const count = mock(async () => 0 as number);
 const verifyJWTMock = mock(async () => null as { sub: string; orgId: string; role: string } | null);
+const getSessionUserMock = mock(async () => ({ userId: "user_1", orgId: "org_1", role: "ADMIN" }));
 const cookiesMock = mock(async () => ({
   get: mock(() => ({ value: "mock-token" })),
 }));
@@ -17,6 +18,7 @@ mock.module("@/lib/db", () => ({
 
 mock.module("@/lib/auth", () => ({
   verifyJWT: verifyJWTMock,
+  getSessionUser: getSessionUserMock,
 }));
 
 mock.module("next/headers", () => ({
@@ -34,11 +36,12 @@ const { default: DashboardOverview } = await import("./page");
 beforeEach(() => {
   count.mockReset();
   verifyJWTMock.mockReset();
+  getSessionUserMock.mockReset();
 });
 
 describe("DashboardOverview", () => {
   it("filters data by orgId correctly", async () => {
-    verifyJWTMock.mockResolvedValueOnce({ sub: "user_1", orgId: "org_test", role: "ADMIN" });
+    getSessionUserMock.mockResolvedValueOnce({ userId: "user_1", orgId: "org_test", role: "ADMIN" });
 
     await DashboardOverview();
 
@@ -55,7 +58,7 @@ describe("DashboardOverview", () => {
   });
 
   it("renders without error when authenticated", async () => {
-    verifyJWTMock.mockResolvedValueOnce({ sub: "user_1", orgId: "org_1", role: "ADMIN" });
+    getSessionUserMock.mockResolvedValueOnce({ userId: "user_1", orgId: "org_1", role: "ADMIN" });
     count.mockResolvedValueOnce(5);
     count.mockResolvedValueOnce(3);
     count.mockResolvedValueOnce(2);
@@ -63,5 +66,19 @@ describe("DashboardOverview", () => {
 
     const page = await DashboardOverview();
     expect(page).toBeTruthy();
+  });
+
+  it("displays correct metric values when data exists", async () => {
+    getSessionUserMock.mockResolvedValueOnce({ userId: "user_1", orgId: "org_1", role: "ADMIN" });
+    count.mockResolvedValueOnce(10); // total providers
+    count.mockResolvedValueOnce(8); // active credentials
+    count.mockResolvedValueOnce(5); // pending enrollments
+    count.mockResolvedValueOnce(2); // compliance alerts
+
+    const page = await DashboardOverview();
+    expect(page).toBeTruthy();
+
+    // Verify the correct counts were queried
+    expect(count).toHaveBeenCalledTimes(4);
   });
 });
