@@ -13,12 +13,14 @@ export const WORKFLOW_DEFINITIONS: Record<WorkflowType, string[]> = {
   ],
   license: ["APPLICATION_PREP", "SUBMITTED", "STATE_REVIEW", "ISSUED"],
   enrollment: ["SUBMITTED", "PAYER_ACK", "FOLLOW_UP", "APPROVED"],
+  compliance: ["CHECK_OIG", "CHECK_SAM", "CHECK_NPDB", "COMPLETED"],
 };
 
 const PREFIX_TO_TYPE: Record<string, WorkflowType> = {
   cred_: "credentialing",
   lic_: "license",
   enr_: "enrollment",
+  comp_: "compliance",
 };
 
 // How many steps are already completed in the seeded scenario, per workflow type.
@@ -27,12 +29,14 @@ const SEED_PROGRESS: Record<WorkflowType, number> = {
   credentialing: 3,
   license: 2,
   enrollment: 2,
+  compliance: 0,
 };
 
 const SEED_START_TIME: Record<WorkflowType, string> = {
   credentialing: "2026-04-20T09:00:00Z",
   license: "2026-04-22T08:00:00Z",
   enrollment: "2026-04-23T10:00:00Z",
+  compliance: "2026-04-24T08:00:00Z",
 };
 
 export function inferType(workflowId: string): WorkflowType {

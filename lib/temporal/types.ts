@@ -12,7 +12,8 @@ export type WorkflowExecutionStatus =
 export type WorkflowType =
   | "credentialing"
   | "license"
-  | "enrollment";
+  | "enrollment"
+  | "compliance";
 
 export type WorkflowExecutionDescription = {
   workflowId: string;

@@ -16,6 +16,22 @@ export function registerDbSync() {
     prisma.license
       .updateMany({ where: { workflowId, status: "PENDING" }, data: { status: "ACTIVE" } })
       .catch(() => {});
+
+    // Handle compliance workflow completion - check result and revoke if FLAG
+    if (workflowId.startsWith("comp_")) {
+      const checkId = workflowId.replace("comp_", "");
+      prisma.complianceCheck
+        .findUnique({ where: { id: checkId } })
+        .then((check) => {
+          if (check && check.result === "FLAG") {
+            prisma.license
+              .updateMany({ where: { providerId: check.providerId, status: "ACTIVE" }, data: { status: "REVOKED" } })
+              .catch(() => {});
+            console.log(`[compliance] License revoked for provider ${check.providerId} (FLAG result found)`);
+          }
+        })
+        .catch(() => {});
+    }
   };
 
   controls.onFail = (workflowId) => {
@@ -29,6 +45,22 @@ export function registerDbSync() {
     prisma.license
       .updateMany({ where: { workflowId, status: "PENDING" }, data: { status: "REVOKED" } })
       .catch(() => {});
+
+    // Handle compliance workflow failure - revoke license
+    if (workflowId.startsWith("comp_")) {
+      const checkId = workflowId.replace("comp_", "");
+      prisma.complianceCheck
+        .findUnique({ where: { id: checkId } })
+        .then((check) => {
+          if (check) {
+            prisma.license
+              .updateMany({ where: { providerId: check.providerId, status: "ACTIVE" }, data: { status: "REVOKED" } })
+              .catch(() => {});
+            console.log(`[compliance] License revoked for provider ${check.providerId}`);
+          }
+        })
+        .catch(() => {});
+    }
   };
 }
 
@@ -80,6 +112,20 @@ export async function reconcileAll() {
       status: string;
     }[];
 
+    // Reconcile compliance workflows based on ComplianceCheck results
+    const complianceChecks = await prisma.complianceCheck.findMany({
+      select: { id: true, result: true },
+    });
+
+    for (const check of complianceChecks) {
+      const workflowId = `comp_${check.id}`;
+      const status = check.result === "CLEAN" ? "COMPLETED" : "FAILED";
+      reconcileWorkflow(workflowId, status);
+      console.log(
+        `[compliance] ${workflowId} reconciled to ${status} (DB: ${check.result})`,
+      );
+    }
+
     for (const row of all) {
       if (!row.workflowId) continue;
       reconcileWorkflow(row.workflowId, row.status);
@@ -91,4 +137,46 @@ export async function reconcileAll() {
     controls.onComplete = savedOnComplete;
     controls.onFail = savedOnFail;
   }
+}
+
+// ─── Compliance Scheduler ─────────────────────────────────────────────────────
+
+export function startComplianceScheduler() {
+  if (process.env.NODE_ENV === "production") return;
+
+  const interval = setInterval(async () => {
+    try {
+      // Find providers with ACTIVE licenses
+      const providers = await prisma.provider.findMany({
+        where: {
+          licenses: {
+            some: { status: "ACTIVE" },
+          },
+        },
+        include: {
+          licenses: true,
+        },
+      });
+
+      for (const provider of providers) {
+        // Create new ComplianceCheck record and workflow every 30 seconds
+        const check = await prisma.complianceCheck.create({
+          data: {
+            providerId: provider.id,
+            source: "SCHEDULED_CHECK",
+            result: "CLEAN",
+          },
+        });
+
+        const workflowId = `comp_${check.id}`;
+        controls.create(workflowId, { status: "RUNNING", completedCount: 0 });
+        controls.startAuto(workflowId); // Enable auto-play with random failure chance
+        console.log(`[compliance] Started workflow ${workflowId} for provider ${provider.id}`);
+      }
+    } catch (error) {
+      console.error("[compliance] Scheduler error:", error);
+    }
+  }, 30000); // 30 seconds
+
+  console.log("[compliance] Scheduler started (30s interval)");
 }
