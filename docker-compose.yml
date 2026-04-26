@@ -42,8 +42,7 @@ services:
       db:
         condition: service_healthy
     command: >
-      sh -c "rm -rf .next &&
-             bunx prisma generate &&
+      sh -c "bunx prisma generate &&
              bunx prisma migrate deploy &&
              bun run db:seed &&
              bun run dev"
