@@ -5,6 +5,7 @@ import { WorkflowTimeline } from "@/components/dashboard/workflow-timeline";
 import { StatusBadge } from "@/components/dashboard/status-badge";
 import { formatDate } from "@/lib/format";
 import { WorkflowHeartbeat } from "@/components/dashboard/workflow-heartbeat";
+import { LicenseFilters } from "@/components/dashboard/licensing/license-filters";
 import type { LicenseStatus } from "@prisma/client";
 
 interface LicensingPageProps {
@@ -31,45 +32,18 @@ export default async function LicensingPage({ searchParams }: LicensingPageProps
     <div>
       <h1 className="mb-6 text-2xl font-bold">License Management</h1>
 
-      {licenses.length === 0 ? (
-        <div className="rounded border p-6 text-gray-600">
-          No licenses with active workflows. Add a provider and create a license application.
-        </div>
-      ) : (
-        <div className="grid grid-cols-12 gap-6">
-          <aside className="col-span-12 md:col-span-5 lg:col-span-4">
-            <div className="mb-4 space-y-2">
-              <a href="/dashboard/licensing" className="block text-sm font-medium text-gray-700 hover:text-gray-900">
-                Clear filters
-              </a>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  name="state"
-                  placeholder="State (e.g., CA)"
-                  defaultValue={state}
-                  className="w-full rounded border px-3 py-1.5 text-sm"
-                />
-                <input
-                  type="number"
-                  name="expiringInDays"
-                  placeholder="Expiring in days"
-                  defaultValue={expiringInDays}
-                  className="w-full rounded border px-3 py-1.5 text-sm"
-                />
-              </div>
-              <select
-                name="status"
-                defaultValue={status}
-                className="w-full rounded border px-3 py-1.5 text-sm"
-              >
-                <option value="">All Statuses</option>
-                <option value="ACTIVE">Active</option>
-                <option value="EXPIRED">Expired</option>
-                <option value="PENDING">Pending</option>
-                <option value="REVOKED">Revoked</option>
-              </select>
+      <div className="grid grid-cols-12 gap-6">
+        <aside className="col-span-12 md:col-span-5 lg:col-span-4">
+          <LicenseFilters
+            currentStatus={status}
+            currentState={state}
+            currentExpiringInDays={expiringInDays}
+          />
+          {licenses.length === 0 ? (
+            <div className="rounded border p-6 text-gray-600">
+              No licenses with active workflows. Add a provider and create a license application.
             </div>
+          ) : (
             <ul data-testid="license-list" className="divide-y rounded border bg-white">
               {licenses.map((l) => {
                 const isSelected = l.id === selectedLicenseId;
@@ -97,8 +71,10 @@ export default async function LicensingPage({ searchParams }: LicensingPageProps
                 );
               })}
             </ul>
-          </aside>
+          )}
+        </aside>
 
+        {licenses.length > 0 && (
           <section className="col-span-12 md:col-span-7 lg:col-span-8">
             {detail ? (
               <div data-testid="license-detail">
@@ -126,8 +102,8 @@ export default async function LicensingPage({ searchParams }: LicensingPageProps
               </div>
             )}
           </section>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
