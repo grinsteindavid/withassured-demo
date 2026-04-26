@@ -7,7 +7,7 @@ import { formatDate } from "@/lib/format";
 import { WorkflowHeartbeat } from "@/components/dashboard/workflow-heartbeat";
 
 interface CompliancePageProps {
-  searchParams: Promise<{ check?: string; result?: string; source?: string }>;
+  searchParams: Promise<{ check?: string; result?: string; source?: string; providerId?: string }>;
 }
 
 export default async function CompliancePage({ searchParams }: CompliancePageProps) {
@@ -17,10 +17,11 @@ export default async function CompliancePage({ searchParams }: CompliancePagePro
     redirect("/login");
   }
 
-  const { check: selectedCheckId, result, source } = await searchParams;
+  const { check: selectedCheckId, result, source, providerId } = await searchParams;
   const filters = {
     result,
     source,
+    providerId,
   };
   const workflows = await listComplianceWorkflows(user.orgId, filters);
   const detail = selectedCheckId ? await getComplianceWorkflowDetail(selectedCheckId, user.orgId) : null;
@@ -43,7 +44,7 @@ export default async function CompliancePage({ searchParams }: CompliancePagePro
                   <li key={w.id}>
                     <a
                       data-testid={`compliance-${w.id}`}
-                      href={`/dashboard/compliance?check=${w.id}${result ? `&result=${result}` : ""}${source ? `&source=${source}` : ""}`}
+                      href={`/dashboard/compliance?check=${w.id}${result ? `&result=${result}` : ""}${source ? `&source=${source}` : ""}${providerId ? `&providerId=${providerId}` : ""}`}
                       className={`block p-3 hover:bg-gray-50 ${isSelected ? "bg-gray-100" : ""}`}
                     >
                       <div className="mb-1 flex items-center justify-between gap-2">

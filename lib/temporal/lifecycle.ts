@@ -46,7 +46,7 @@ export function registerDbSync() {
       .updateMany({ where: { workflowId, status: "PENDING" }, data: { status: "REVOKED" } })
       .catch(() => {});
 
-    // Handle compliance workflow failure - revoke license
+    // Handle compliance workflow failure - revoke license and update check result
     if (workflowId.startsWith("comp_")) {
       const checkId = workflowId.replace("comp_", "");
       prisma.complianceCheck
@@ -56,7 +56,10 @@ export function registerDbSync() {
             prisma.license
               .updateMany({ where: { providerId: check.providerId, status: "ACTIVE" }, data: { status: "REVOKED" } })
               .catch(() => {});
-            console.log(`[compliance] License revoked for provider ${check.providerId}`);
+            prisma.complianceCheck
+              .update({ where: { id: checkId }, data: { result: "FLAG" } })
+              .catch(() => {});
+            console.log(`[compliance] License revoked and check result set to FLAG for provider ${check.providerId}`);
           }
         })
         .catch(() => {});
@@ -146,11 +149,12 @@ export function startComplianceScheduler() {
 
   const interval = setInterval(async () => {
     try {
-      // Find providers with ACTIVE licenses
+      // Find providers with ACTIVE licenses and no REVOKED licenses
       const providers = await prisma.provider.findMany({
         where: {
           licenses: {
             some: { status: "ACTIVE" },
+            none: { status: "REVOKED" },
           },
         },
         include: {
@@ -176,7 +180,7 @@ export function startComplianceScheduler() {
     } catch (error) {
       console.error("[compliance] Scheduler error:", error);
     }
-  }, 30000); // 30 seconds
+  }, 60000); // 60 seconds
 
-  console.log("[compliance] Scheduler started (30s interval)");
+  console.log("[compliance] Scheduler started (60s interval)");
 }

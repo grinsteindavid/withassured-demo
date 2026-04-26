@@ -42,12 +42,14 @@ export async function listComplianceWorkflows(
   filters?: {
     result?: string;
     source?: string;
+    providerId?: string;
   },
 ): Promise<ComplianceSummary[]> {
   const where: {
     provider: { orgId: string };
     result?: string;
     source?: string;
+    providerId?: string;
   } = {
     provider: { orgId },
   };
@@ -58,6 +60,10 @@ export async function listComplianceWorkflows(
 
   if (filters?.source) {
     where.source = filters.source;
+  }
+
+  if (filters?.providerId) {
+    where.providerId = filters.providerId;
   }
 
   const checks = await prisma.complianceCheck.findMany({
