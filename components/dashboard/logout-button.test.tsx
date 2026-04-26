@@ -1,6 +1,4 @@
 import { describe, it, expect, mock, spyOn } from "bun:test";
-import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 
 const push = mock(() => {});
 const refresh = mock(() => {});
@@ -8,6 +6,9 @@ const refresh = mock(() => {});
 mock.module("next/navigation", () => ({
   useRouter: () => ({ push, refresh }),
 }));
+
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
 const { LogoutButton } = await import("./logout-button");
 

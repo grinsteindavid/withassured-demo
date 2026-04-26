@@ -29,6 +29,10 @@ mock.module("next/navigation", () => ({
   redirect: mock(() => {
     throw new Error("NEXT_REDIRECT");
   }),
+  useRouter: () => ({
+    push: mock(() => {}),
+    refresh: mock(() => {}),
+  }),
 }));
 
 const { default: DashboardOverview } = await import("./page");
