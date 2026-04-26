@@ -1,6 +1,6 @@
-# Assured — Business Model
+# Business model
 
-> Companion document to `README.md`. Explains what Assured (withassured.com) does, how it makes money, and how this dashboard scaffold maps to their business.
+Companion to the README. Explains what Assured does, how it makes money, and how this dashboard scaffold maps to their business.
 
 ## One-liner
 
