@@ -37,6 +37,7 @@ mock.module("next/navigation", () => ({
     push: mock(() => {}),
     refresh: mock(() => {}),
   }),
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 const { default: DashboardOverview } = await import("./page");

@@ -5,6 +5,7 @@ const refresh = mock(() => {});
 
 mock.module("next/navigation", () => ({
   useRouter: () => ({ push, refresh }),
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 import { render, screen } from "@testing-library/react";

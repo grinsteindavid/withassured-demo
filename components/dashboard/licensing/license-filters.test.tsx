@@ -3,18 +3,13 @@ import { describe, it, expect, mock } from "bun:test";
 const push = mock(() => {});
 
 mock.module("next/navigation", () => ({
-  default: {
-    useRouter: () => ({ push }),
-    useSearchParams: () => new URLSearchParams(),
-  },
   useRouter: () => ({ push }),
   useSearchParams: () => new URLSearchParams(),
 }));
 
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-
-const { LicenseFilters } = await import("./license-filters");
+import { LicenseFilters } from "./license-filters";
 
 describe("<LicenseFilters />", () => {
   it("renders filter inputs with correct placeholders", () => {
