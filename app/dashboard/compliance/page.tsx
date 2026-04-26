@@ -1,10 +1,11 @@
-import { listComplianceWorkflows, getComplianceWorkflowDetail } from "@/lib/compliance";
+import { listComplianceWorkflows, getComplianceWorkflowDetail, getProvidersByOrg } from "@/lib/compliance";
 import { getSessionUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { WorkflowTimeline } from "@/components/dashboard/workflow-timeline";
 import { StatusBadge } from "@/components/dashboard/status-badge";
 import { formatDate } from "@/lib/format";
 import { WorkflowHeartbeat } from "@/components/dashboard/workflow-heartbeat";
+import { ComplianceFilters } from "@/components/dashboard/compliance/compliance-filters";
 
 interface CompliancePageProps {
   searchParams: Promise<{ check?: string; result?: string; source?: string; providerId?: string }>;
@@ -18,6 +19,7 @@ export default async function CompliancePage({ searchParams }: CompliancePagePro
   }
 
   const { check: selectedCheckId, result, source, providerId } = await searchParams;
+  const providers = await getProvidersByOrg(user.orgId);
   const filters = {
     result,
     source,
@@ -32,6 +34,12 @@ export default async function CompliancePage({ searchParams }: CompliancePagePro
 
       <div className="grid grid-cols-12 gap-6">
         <aside className="col-span-12 md:col-span-5 lg:col-span-4">
+          <ComplianceFilters
+            providers={providers}
+            currentProviderId={providerId}
+            currentResult={result}
+            currentSource={source}
+          />
           {workflows.length === 0 ? (
             <div className="rounded border p-6 text-gray-600">
               No compliance checks with active workflows.

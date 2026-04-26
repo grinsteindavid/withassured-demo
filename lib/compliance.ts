@@ -4,6 +4,14 @@ import { currentStep, fullStepList } from "@/lib/temporal/derive";
 import type { WorkflowStep } from "@/lib/temporal/types";
 import type { Provider } from "@prisma/client";
 
+export async function getProvidersByOrg(orgId: string) {
+  return prisma.provider.findMany({
+    where: { orgId },
+    select: { id: true, name: true },
+    orderBy: { name: "asc" },
+  });
+}
+
 type ComplianceCheckWithProvider = {
   id: string;
   providerId: string;
