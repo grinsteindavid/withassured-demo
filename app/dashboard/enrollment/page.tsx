@@ -1,11 +1,24 @@
 import { prisma } from "@/lib/db";
+import { getSessionUser } from "@/lib/auth";
+import { redirect } from "next/navigation";
 import { DataTable } from "@/components/dashboard/data-table";
 import { EnrollmentRow } from "@/components/dashboard/enrollment/enrollment-row";
 
 export default async function EnrollmentPage() {
+  const user = await getSessionUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
   const [enrollments, providers] = await Promise.all([
-    prisma.payerEnrollment.findMany(),
-    prisma.provider.findMany({ select: { id: true, name: true } }),
+    prisma.payerEnrollment.findMany({
+      where: { provider: { orgId: user.orgId } },
+    }),
+    prisma.provider.findMany({
+      where: { orgId: user.orgId },
+      select: { id: true, name: true },
+    }),
   ]);
   const providerMap = new Map(providers.map((p) => [p.id, p.name] as [string, string]));
 

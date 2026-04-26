@@ -18,9 +18,12 @@ export type CredentialingCaseDetail = CredentialingCaseSummary & {
   steps: WorkflowStep[];
 };
 
-export async function listCredentialingCases(): Promise<CredentialingCaseSummary[]> {
+export async function listCredentialingCases(orgId: string): Promise<CredentialingCaseSummary[]> {
   const providers = await prisma.provider.findMany({
-    where: { credentialingCase: { isNot: null } },
+    where: {
+      credentialingCase: { isNot: null },
+      orgId,
+    },
     include: { credentialingCase: true },
     orderBy: { name: "asc" },
   });
@@ -46,12 +49,14 @@ export async function listCredentialingCases(): Promise<CredentialingCaseSummary
 
 export async function getCredentialingCaseDetail(
   providerId: string,
+  orgId: string,
 ): Promise<CredentialingCaseDetail | null> {
   const provider = await prisma.provider.findUnique({
     where: { id: providerId },
     include: { credentialingCase: true },
   });
   if (!provider || !provider.credentialingCase) return null;
+  if (provider.orgId !== orgId) return null;
 
   const workflowId = provider.credentialingCase.workflowId;
   const handle = mockTemporal.workflow.getHandle(workflowId);

@@ -16,7 +16,7 @@ const fakeProvider = (over: Partial<{ id: string; name: string; specialty: strin
   specialty: over.specialty ?? "Cardiology",
   npi: over.npi ?? "1234567890",
   status: "ACTIVE",
-  orgId: "org_1",
+  orgId: "org_test",
   credentialingCase: {
     id: "cc_1",
     providerId: over.id ?? "p_1",
@@ -38,7 +38,7 @@ describe("listCredentialingCases", () => {
       fakeProvider({ id: "p_2", name: "Dr. Bob", workflowId: "cred_bob" }),
     ]);
 
-    const cases = await listCredentialingCases();
+    const cases = await listCredentialingCases("org_test");
 
     expect(cases).toHaveLength(2);
     expect(cases[0].providerName).toBe("Dr. Alice");
@@ -49,9 +49,9 @@ describe("listCredentialingCases", () => {
 
   it("queries only providers with a credentialing case attached", async () => {
     findMany.mockResolvedValueOnce([]);
-    await listCredentialingCases();
+    await listCredentialingCases("org_test");
     expect(findMany).toHaveBeenCalledWith({
-      where: { credentialingCase: { isNot: null } },
+      where: { credentialingCase: { isNot: null }, orgId: "org_test" },
       include: { credentialingCase: true },
       orderBy: { name: "asc" },
     });
@@ -59,12 +59,12 @@ describe("listCredentialingCases", () => {
 
   it("reflects state changes after controls.advance()", async () => {
     findMany.mockResolvedValueOnce([fakeProvider({ workflowId: "cred_advance_test" })]);
-    await listCredentialingCases();
+    await listCredentialingCases("org_test");
 
     controls.advance("cred_advance_test");
 
     findMany.mockResolvedValueOnce([fakeProvider({ workflowId: "cred_advance_test" })]);
-    const after = await listCredentialingCases();
+    const after = await listCredentialingCases("org_test");
     expect(after[0].currentStep).toBe("COMMITTEE_REVIEW");
   });
 });
@@ -73,7 +73,7 @@ describe("getCredentialingCaseDetail", () => {
   it("returns full detail with steps when the provider has a case", async () => {
     findUnique.mockResolvedValueOnce(fakeProvider({ id: "p_42", workflowId: "cred_42" }));
 
-    const detail = await getCredentialingCaseDetail("p_42");
+    const detail = await getCredentialingCaseDetail("p_42", "org_test");
 
     expect(detail).not.toBeNull();
     expect(detail!.providerId).toBe("p_42");
@@ -90,7 +90,7 @@ describe("getCredentialingCaseDetail", () => {
 
   it("returns null when the provider does not exist", async () => {
     findUnique.mockResolvedValueOnce(null);
-    expect(await getCredentialingCaseDetail("missing")).toBeNull();
+    expect(await getCredentialingCaseDetail("missing", "org_test")).toBeNull();
   });
 
   it("returns null when the provider has no credentialing case", async () => {
@@ -100,9 +100,9 @@ describe("getCredentialingCaseDetail", () => {
       specialty: "GP",
       npi: "9999999999",
       status: "ACTIVE",
-      orgId: "org_1",
+      orgId: "org_test",
       credentialingCase: null,
     });
-    expect(await getCredentialingCaseDetail("p_no_case")).toBeNull();
+    expect(await getCredentialingCaseDetail("p_no_case", "org_test")).toBeNull();
   });
 });

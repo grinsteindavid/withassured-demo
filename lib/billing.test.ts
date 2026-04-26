@@ -78,13 +78,14 @@ describe("periodRange", () => {
 describe("getCurrentUsage", () => {
   it("queries uninvoiced events and returns rollup with period bounds", async () => {
     usageFindMany.mockClear();
-    const usage = await getCurrentUsage("current");
+    const usage = await getCurrentUsage("current", "org_test");
 
     expect(usageFindMany).toHaveBeenCalledTimes(1);
     const call = usageFindMany.mock.calls[0][0] as {
-      where: { occurredAt: { gte: Date; lte: Date }; invoiceId: null };
+      where: { occurredAt: { gte: Date; lte: Date }; invoiceId: null; orgId: string };
     };
     expect(call.where.invoiceId).toBeNull();
+    expect(call.where.orgId).toBe("org_test");
     expect(usage.subtotalCents).toBe(49_700);
     expect(usage.totalCents).toBe(199_700);
     expect(usage.platformFeeCents).toBe(150_000);
@@ -94,12 +95,12 @@ describe("getCurrentUsage", () => {
 describe("listAllInvoices", () => {
   it("merges DB and stripe-mock invoices, sorted by periodStart desc", async () => {
     createInvoice({
-      customerId: "org_1",
+      customerId: "org_test",
       lines: [{ description: "demo", amount: 5000, quantity: 1 }],
       autoAdvance: true,
     });
 
-    const all = await listAllInvoices();
+    const all = await listAllInvoices("org_test");
     expect(all).toHaveLength(2);
     const stripeRow = all.find((i) => i.id.startsWith("inv_mock_"));
     const dbRow = all.find((i) => i.id === "db_inv_1");
@@ -111,12 +112,12 @@ describe("listAllInvoices", () => {
 
   it("uppercases stripe-mock status to match the DB union", async () => {
     createInvoice({
-      customerId: "org_1",
+      customerId: "org_test",
       lines: [{ description: "demo", amount: 5000, quantity: 1 }],
       autoAdvance: true,
     });
 
-    const all = await listAllInvoices();
+    const all = await listAllInvoices("org_test");
     const stripeRow = all.find((i) => i.id.startsWith("inv_mock_"))!;
     expect(stripeRow.status).toBe("OPEN");
   });

@@ -1,4 +1,13 @@
-export default function LicensingPage() {
+import { getSessionUser } from "@/lib/auth";
+import { redirect } from "next/navigation";
+
+export default async function LicensingPage() {
+  const user = await getSessionUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
   return (
     <div>
       <h1 className="mb-6 text-2xl font-bold">License Management</h1>

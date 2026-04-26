@@ -48,12 +48,13 @@ export function periodRange(period: "current" | "previous", now: Date = new Date
   return { periodStart, periodEnd };
 }
 
-export async function getCurrentUsage(period: "current" | "previous") {
+export async function getCurrentUsage(period: "current" | "previous", orgId: string) {
   const { periodStart, periodEnd } = periodRange(period);
   const events = await prisma.usageEvent.findMany({
     where: {
       occurredAt: { gte: periodStart, lte: periodEnd },
       invoiceId: null,
+      orgId,
     },
   });
   return {
@@ -66,8 +67,10 @@ export async function getCurrentUsage(period: "current" | "previous") {
   };
 }
 
-export async function listAllInvoices(orgId = "org_1") {
-  const dbInvoices = await prisma.invoice.findMany();
+export async function listAllInvoices(orgId: string) {
+  const dbInvoices = await prisma.invoice.findMany({
+    where: { orgId },
+  });
   const mockInvoices = listInvoices(orgId).map((inv) => ({
     id: inv.id,
     orgId: inv.customer,

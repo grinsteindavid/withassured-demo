@@ -2,11 +2,19 @@ import { UsageCards } from "@/components/dashboard/billing/usage-cards";
 import { InvoiceTable } from "@/components/dashboard/billing/invoice-table";
 import { PayButton } from "@/components/dashboard/billing/pay-button";
 import { getCurrentUsage, listAllInvoices } from "@/lib/billing";
+import { getSessionUser } from "@/lib/auth";
+import { redirect } from "next/navigation";
 
 export default async function BillingPage() {
+  const user = await getSessionUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
   const [usage, invoices] = await Promise.all([
-    getCurrentUsage("current").catch(() => null),
-    listAllInvoices().catch(() => [] as Awaited<ReturnType<typeof listAllInvoices>>),
+    getCurrentUsage("current", user.orgId).catch(() => null),
+    listAllInvoices(user.orgId).catch(() => [] as Awaited<ReturnType<typeof listAllInvoices>>),
   ]);
 
   const openInvoice = invoices.find(
