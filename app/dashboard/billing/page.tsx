@@ -1,7 +1,10 @@
 import { UsageCards } from "@/components/dashboard/billing/usage-cards";
 import { InvoiceTable } from "@/components/dashboard/billing/invoice-table";
 import { PayButton } from "@/components/dashboard/billing/pay-button";
+import { PaymentMethods } from "@/components/dashboard/billing/payment-methods";
+import { SubscriptionCard } from "@/components/dashboard/billing/subscription-card";
 import { getCurrentUsage, listAllInvoices } from "@/lib/billing";
+import { listPaymentMethods, getSubscription } from "@/lib/payments";
 import { getSessionUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 
@@ -12,9 +15,11 @@ export default async function BillingPage() {
     redirect("/login");
   }
 
-  const [usage, invoices] = await Promise.all([
+  const [usage, invoices, paymentMethods, subscription] = await Promise.all([
     getCurrentUsage("current", user.orgId).catch(() => null),
     listAllInvoices(user.orgId).catch(() => [] as Awaited<ReturnType<typeof listAllInvoices>>),
+    listPaymentMethods(user.orgId).catch(() => []),
+    getSubscription(user.orgId).catch(() => null),
   ]);
 
   const openInvoice = invoices.find(
@@ -24,6 +29,11 @@ export default async function BillingPage() {
   return (
     <div>
       <h1 className="mb-6 text-2xl font-bold">Billing</h1>
+
+      <div className="grid gap-6 mb-8 md:grid-cols-2">
+        <SubscriptionCard subscription={subscription} />
+        <PaymentMethods methods={paymentMethods} />
+      </div>
 
       {usage ? (
         <div className="mb-8">
@@ -46,7 +56,16 @@ export default async function BillingPage() {
       <div>
         <h2 className="mb-4 text-lg font-semibold">Invoice History</h2>
         {invoices.length > 0 ? (
-          <InvoiceTable invoices={invoices} />
+          <InvoiceTable
+            invoices={invoices.map((inv) => ({
+              id: inv.id,
+              periodStart: inv.periodStart instanceof Date ? inv.periodStart.toISOString() : inv.periodStart as string,
+              periodEnd: inv.periodEnd instanceof Date ? inv.periodEnd.toISOString() : inv.periodEnd as string,
+              subtotalCents: inv.subtotalCents,
+              totalCents: inv.totalCents,
+              status: inv.status as string,
+            }))}
+          />
         ) : (
           <div className="rounded border p-4 text-gray-600">No invoices yet.</div>
         )}

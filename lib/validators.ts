@@ -35,3 +35,16 @@ export const providerQuerySchema = z.object({
   specialty: z.string().optional(),
   search: z.string().optional(),
 });
+
+export const addPaymentMethodSchema = z.object({
+  type: z.enum(["CARD", "ACH"]),
+  last4: z.string().length(4),
+  expiryMonth: z.coerce.number().min(1).max(12),
+  expiryYear: z.coerce.number().min(new Date().getFullYear()),
+  brand: z.string().optional(),
+  setDefault: z.boolean().default(false),
+});
+
+export const createSubscriptionSchema = z.object({
+  plan: z.enum(["STARTUP", "GROWTH", "ENTERPRISE"]),
+});

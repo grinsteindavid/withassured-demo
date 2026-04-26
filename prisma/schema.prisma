@@ -51,16 +51,36 @@ enum InvoiceStatus {
   VOID
 }
 
+enum PaymentMethodType {
+  CARD
+  ACH
+}
+
+enum SubscriptionPlan {
+  STARTUP
+  GROWTH
+  ENTERPRISE
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  TRIALING
+}
+
 model Organization {
-  id          String        @id @default(cuid())
-  name        String
-  plan        BillingPlan?
-  users       User[]
-  providers   Provider[]
-  usageEvents UsageEvent[]
-  invoices    Invoice[]
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  id               String           @id @default(cuid())
+  name             String
+  plan             BillingPlan?
+  users            User[]
+  providers        Provider[]
+  usageEvents      UsageEvent[]
+  invoices         Invoice[]
+  paymentMethods   PaymentMethod[]
+  subscription     Subscription?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 }
 
 model User {
@@ -181,4 +201,28 @@ model Invoice {
   events        UsageEvent[]
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
+}
+
+model PaymentMethod {
+  id                   String             @id @default(cuid())
+  orgId                String
+  type                 PaymentMethodType
+  isDefault            Boolean            @default(false)
+  stripePaymentMethodId String             @unique
+  organization          Organization       @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+}
+
+model Subscription {
+  id                 String              @id @default(cuid())
+  orgId              String              @unique
+  plan               SubscriptionPlan
+  status             SubscriptionStatus
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+  cancelAtPeriodEnd  Boolean             @default(false)
+  organization       Organization        @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
 }

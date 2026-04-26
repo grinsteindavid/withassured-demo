@@ -135,7 +135,7 @@ export async function recordUsageEvent(
   return event;
 }
 
-export async function processInvoicePayment(id: string) {
+export async function processInvoicePayment(id: string, paymentMethodId?: string) {
   const mockResult = payInvoice(id);
   if (mockResult) {
     await prisma.invoice.updateMany({
