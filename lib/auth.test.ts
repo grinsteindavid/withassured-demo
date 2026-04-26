@@ -1,6 +1,6 @@
 import { describe, it, expect, mock } from "bun:test";
 import { decodeJwt } from "jose";
-import { hashPassword, verifyPassword, signJWT, verifyJWT } from "./auth";
+import { hashPassword, verifyPassword, signJWT, verifyJWT, getSessionUser } from "./auth";
 
 describe("hashPassword", () => {
   it("hashes a password with bcrypt", async () => {
@@ -119,5 +119,50 @@ describe("authenticateUser", () => {
     });
     const result = await authenticateUser("test@test.com", "correctpass");
     expect(result).toEqual({ id: "u_1", email: "test@test.com", role: "ADMIN", orgId: "org_1" });
+  });
+});
+
+const cookiesMock = mock(async () => ({
+  get: mock(() => ({ value: "mock-token" })),
+}));
+
+mock.module("next/headers", () => ({
+  cookies: cookiesMock,
+}));
+
+describe("getSessionUser", () => {
+  it("returns user data when valid session exists", async () => {
+    const payload = { sub: "user-123", orgId: "org-456", role: "ADMIN" };
+    const token = await signJWT(payload);
+    cookiesMock.mockResolvedValueOnce({
+      get: mock(() => ({ value: token })),
+    });
+
+    const result = await getSessionUser();
+
+    expect(result).not.toBeNull();
+    expect(result?.userId).toBe("user-123");
+    expect(result?.orgId).toBe("org-456");
+    expect(result?.role).toBe("ADMIN");
+  });
+
+  it("returns null when no session cookie", async () => {
+    cookiesMock.mockResolvedValueOnce({
+      get: mock(() => undefined) as () => { value: string } | undefined,
+    });
+
+    const result = await getSessionUser();
+
+    expect(result).toBeNull();
+  });
+
+  it("returns null when token verification fails", async () => {
+    cookiesMock.mockResolvedValueOnce({
+      get: mock(() => ({ value: "invalid-token" })),
+    });
+
+    const result = await getSessionUser();
+
+    expect(result).toBeNull();
   });
 });

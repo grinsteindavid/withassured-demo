@@ -59,3 +59,20 @@ export async function authenticateUser(
 
   return { id: user.id, email: user.email, role: user.role, orgId: user.orgId };
 }
+
+export async function getSessionUser(): Promise<{ userId: string; orgId: string; role: string } | null> {
+  const cookieStore = await cookies();
+  const token = cookieStore.get("session")?.value;
+
+  if (!token) {
+    return null;
+  }
+
+  const payload = await verifyJWT(token);
+
+  if (!payload) {
+    return null;
+  }
+
+  return { userId: payload.sub, orgId: payload.orgId, role: payload.role };
+}
