@@ -48,15 +48,17 @@ export type SeedFixture = {
   events: HistoryEvent[];
 };
 
-// Build the initial event log for a workflow: WorkflowExecutionStarted, then
-// {Scheduled, Started, Completed} triplets for each completed step, then
-// {Scheduled, Started} for the currently-running step.
-export function buildSeedFixture(workflowId: string): SeedFixture {
-  const type = inferType(workflowId);
-  const definition = WORKFLOW_DEFINITIONS[type];
-  const completedCount = SEED_PROGRESS[type];
-  const startTime = new Date(SEED_START_TIME[type]);
+export type WorkflowHistoryOpts = {
+  status: "RUNNING" | "COMPLETED" | "FAILED";
+  completedCount: number;
+};
 
+function buildEvents(
+  definition: string[],
+  status: WorkflowHistoryOpts["status"],
+  completedCount: number,
+  startTime: Date,
+): HistoryEvent[] {
   const events: HistoryEvent[] = [];
   let eventId = 1;
   let cursor = startTime.getTime();
@@ -68,7 +70,8 @@ export function buildSeedFixture(workflowId: string): SeedFixture {
     eventType: "WorkflowExecutionStarted",
   });
 
-  for (let i = 0; i <= completedCount; i++) {
+  // Completed steps
+  for (let i = 0; i < completedCount; i++) {
     const stepName = definition[i];
     if (!stepName) break;
     events.push({
@@ -84,15 +87,81 @@ export function buildSeedFixture(workflowId: string): SeedFixture {
       activityType: stepName,
       attempt: 1,
     });
-    if (i < completedCount) {
+    events.push({
+      eventId: eventId++,
+      eventTime: tick(60),
+      eventType: "ActivityTaskCompleted",
+      activityType: stepName,
+    });
+  }
+
+  // Current / failed step
+  if (status === "RUNNING" || status === "FAILED") {
+    const currentIndex = completedCount;
+    const stepName = definition[currentIndex];
+    if (stepName) {
       events.push({
         eventId: eventId++,
-        eventTime: tick(60),
-        eventType: "ActivityTaskCompleted",
+        eventTime: tick(30),
+        eventType: "ActivityTaskScheduled",
         activityType: stepName,
       });
+      events.push({
+        eventId: eventId++,
+        eventTime: tick(1),
+        eventType: "ActivityTaskStarted",
+        activityType: stepName,
+        attempt: 1,
+      });
+      if (status === "FAILED") {
+        events.push({
+          eventId: eventId++,
+          eventTime: tick(60),
+          eventType: "ActivityTaskFailed",
+          activityType: stepName,
+          failure: { message: "reconciled" },
+        });
+      }
     }
   }
 
+  // Terminal event
+  if (status === "COMPLETED") {
+    events.push({
+      eventId: eventId++,
+      eventTime: tick(30),
+      eventType: "WorkflowExecutionCompleted",
+    });
+  } else if (status === "FAILED") {
+    events.push({
+      eventId: eventId++,
+      eventTime: tick(30),
+      eventType: "WorkflowExecutionFailed",
+      failure: { message: "reconciled" },
+    });
+  }
+
+  return events;
+}
+
+// Build the initial event log for a workflow: WorkflowExecutionStarted, then
+// {Scheduled, Started, Completed} triplets for each completed step, then
+// {Scheduled, Started} for the currently-running step.
+export function buildSeedFixture(workflowId: string): SeedFixture {
+  const type = inferType(workflowId);
+  const startTime = new Date(SEED_START_TIME[type]);
+  const definition = WORKFLOW_DEFINITIONS[type];
+  const events = buildEvents(definition, "RUNNING", SEED_PROGRESS[type], startTime);
+  return { type, startTime, events };
+}
+
+export function buildWorkflowHistory(
+  workflowId: string,
+  opts: WorkflowHistoryOpts,
+): SeedFixture {
+  const type = inferType(workflowId);
+  const startTime = new Date();
+  const definition = WORKFLOW_DEFINITIONS[type];
+  const events = buildEvents(definition, opts.status, opts.completedCount, startTime);
   return { type, startTime, events };
 }

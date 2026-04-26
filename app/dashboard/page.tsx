@@ -1,5 +1,6 @@
 import { getDashboardMetrics } from "@/lib/enrollment";
 import { getSessionUser } from "@/lib/auth";
+import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
 
 export default async function DashboardOverview() {
@@ -9,11 +10,18 @@ export default async function DashboardOverview() {
     redirect("/login");
   }
 
+  const org = await prisma.organization.findUnique({
+    where: { id: user.orgId },
+    select: { name: true },
+  });
+
   const { totalProviders, activeCredentials, pendingEnrollments, complianceAlerts } = await getDashboardMetrics(user.orgId);
 
   return (
     <div>
-      <h1 data-testid="dashboard-heading" className="mb-6 text-2xl font-bold">Dashboard Overview</h1>
+      <h1 data-testid="dashboard-heading" className="mb-6 text-2xl font-bold">
+        {org?.name ?? "Dashboard"} Overview
+      </h1>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
         <div className="rounded border p-4" data-testid="metric-total-providers">
           <h3 className="text-sm font-medium text-gray-500">Total Providers</h3>

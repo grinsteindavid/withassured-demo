@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { registerDbSync, reconcileAll } from "@/lib/temporal/lifecycle";
+
+registerDbSync();
+reconcileAll().catch(() => {});
 
 export const metadata: Metadata = {
   title: "Assured Dashboard",

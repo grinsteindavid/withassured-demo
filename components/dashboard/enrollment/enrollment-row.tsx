@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { WorkflowTimeline } from "@/components/dashboard/workflow-timeline";
 import { StatusBadge } from "@/components/dashboard/status-badge";
 import { formatDate } from "@/lib/format";
@@ -25,6 +25,23 @@ export function EnrollmentRow({ enrollment, providerName }: EnrollmentRowProps) 
   const [expanded, setExpanded] = useState(false);
   const [workflow, setWorkflow] = useState<{ steps: WorkflowStep[] } | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Poll when expanded to refresh timeline
+  useEffect(() => {
+    if (!expanded || !enrollment.workflowId) return;
+
+    async function poll() {
+      const res = await fetch(`/api/workflows/${enrollment.workflowId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setWorkflow({ steps: data.steps || [] });
+      }
+    }
+
+    poll();
+    const interval = setInterval(poll, 5000);
+    return () => clearInterval(interval);
+  }, [expanded, enrollment.workflowId]);
 
   async function toggle() {
     if (!enrollment.workflowId) return;

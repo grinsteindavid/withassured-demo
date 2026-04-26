@@ -7,12 +7,15 @@ const cookiesMock = mock(async () => ({
   get: mock(() => ({ value: "mock-token" })),
 }));
 
+const findUnique = mock(async () => ({ name: "Test Org" }));
+
 mock.module("@/lib/db", () => ({
   prisma: {
     provider: { count },
     credentialingCase: { count },
     payerEnrollment: { count },
     complianceCheck: { count },
+    organization: { findUnique },
   },
 }));
 
@@ -39,6 +42,7 @@ const { default: DashboardOverview } = await import("./page");
 
 beforeEach(() => {
   count.mockReset();
+  findUnique.mockReset();
   verifyJWTMock.mockReset();
   getSessionUserMock.mockReset();
 });

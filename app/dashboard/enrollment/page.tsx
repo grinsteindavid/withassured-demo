@@ -3,6 +3,7 @@ import { getSessionUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { DataTable } from "@/components/dashboard/data-table";
 import { EnrollmentRow } from "@/components/dashboard/enrollment/enrollment-row";
+import { WorkflowHeartbeat } from "@/components/dashboard/workflow-heartbeat";
 
 export default async function EnrollmentPage() {
   const user = await getSessionUser();
@@ -23,8 +24,10 @@ export default async function EnrollmentPage() {
   const denied = enrollments.filter((e) => e.status === "DENIED").length;
 
   return (
-    <div>
-      <h1 className="mb-6 text-2xl font-bold">Payer Enrollment</h1>
+    <>
+      <WorkflowHeartbeat />
+      <div>
+        <h1 className="mb-6 text-2xl font-bold">Payer Enrollment</h1>
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-4">
         <div className="rounded border p-4">
@@ -58,5 +61,6 @@ export default async function EnrollmentPage() {
         ))}
       </DataTable>
     </div>
+    </>
   );
 }

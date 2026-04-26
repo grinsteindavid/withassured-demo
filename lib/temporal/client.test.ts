@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "bun:test";
+import { describe, it, expect, beforeEach, spyOn } from "bun:test";
 import { mockTemporal, controls } from "./client";
 
 beforeEach(() => {
@@ -108,5 +108,128 @@ describe("controls.reset", () => {
     controls.reset();
     const after = (await handle.fetchHistory()).events.length;
     expect(after).toBeLessThan(before);
+  });
+});
+
+describe("controls.startAuto", () => {
+  it("advances a workflow when the timer callback fires", async () => {
+    const handle = mockTemporal.workflow.getHandle("cred_auto");
+    await handle.describe();
+
+    const callbacks: (() => void)[] = [];
+    const timeoutSpy = spyOn(
+      globalThis as unknown as { setTimeout: (handler: () => void, ms?: number) => number },
+      "setTimeout",
+    ).mockImplementation((cb: () => void) => {
+      callbacks.push(cb);
+      return 999;
+    });
+    const randomSpy = spyOn(Math, "random").mockReturnValue(0.5); // > 0.2 => advance
+
+    controls.startAuto("cred_auto");
+    expect(callbacks.length).toBe(1);
+
+    callbacks[0]();
+
+    const { events } = await handle.fetchHistory();
+    const completed = events
+      .filter((e) => e.eventType === "ActivityTaskCompleted")
+      .map((e) => e.activityType);
+    expect(completed).toContain("SANCTIONS_CHECK");
+
+    timeoutSpy.mockRestore();
+    randomSpy.mockRestore();
+    controls.stopAuto("cred_auto");
+  });
+
+  it("fails a workflow when Math.random() < 0.1", async () => {
+    const handle = mockTemporal.workflow.getHandle("cred_auto_fail");
+    await handle.describe();
+
+    const callbacks: (() => void)[] = [];
+    const timeoutSpy = spyOn(
+      globalThis as unknown as { setTimeout: (handler: () => void, ms?: number) => number },
+      "setTimeout",
+    ).mockImplementation((cb: () => void) => {
+      callbacks.push(cb);
+      return 888;
+    });
+    const randomSpy = spyOn(Math, "random").mockReturnValue(0.05); // < 0.1 => fail
+
+    controls.startAuto("cred_auto_fail");
+    callbacks[0]();
+
+    const info = await handle.describe();
+    expect(info.status.name).toBe("FAILED");
+
+    timeoutSpy.mockRestore();
+    randomSpy.mockRestore();
+    controls.stopAuto("cred_auto_fail");
+  });
+});
+
+describe("controls.stopAuto", () => {
+  it("calls clearTimeout for the workflow timer", async () => {
+    const handle = mockTemporal.workflow.getHandle("cred_stop");
+    await handle.describe();
+
+    const clearSpy = spyOn(
+      globalThis as unknown as { clearTimeout: (id: number) => void },
+      "clearTimeout",
+    ).mockImplementation(() => {});
+
+    controls.startAuto("cred_stop");
+    controls.stopAuto("cred_stop");
+
+    expect(clearSpy).toHaveBeenCalled();
+
+    clearSpy.mockRestore();
+  });
+});
+
+describe("controls.enableAutoPlay / disableAutoPlay", () => {
+  it("starts timers for all RUNNING workflows when enabled", async () => {
+    const handle1 = mockTemporal.workflow.getHandle("cred_e1");
+    const handle2 = mockTemporal.workflow.getHandle("enr_e2");
+    await handle1.describe();
+    await handle2.describe();
+
+    controls.reset();
+    // Re-seed after reset (auto-play disabled by reset)
+    await handle1.describe();
+    await handle2.describe();
+
+    let callCount = 0;
+    const timeoutSpy = spyOn(
+      globalThis as unknown as { setTimeout: (handler: () => void, ms?: number) => number },
+      "setTimeout",
+    ).mockImplementation(() => {
+      callCount++;
+      return 777;
+    });
+
+    controls.enableAutoPlay();
+    expect(callCount).toBe(2);
+
+    timeoutSpy.mockRestore();
+    controls.reset();
+  });
+
+  it("disableAutoPlay stops all active timers", async () => {
+    const handle = mockTemporal.workflow.getHandle("cred_d1");
+    await handle.describe();
+
+    const clearSpy = spyOn(
+      globalThis as unknown as { clearTimeout: (id: number) => void },
+      "clearTimeout",
+    ).mockImplementation(() => {});
+
+    controls.enableAutoPlay();
+    controls.disableAutoPlay();
+
+    expect(clearSpy).toHaveBeenCalled();
+
+    clearSpy.mockRestore();
+    controls.reset();
   });
 });

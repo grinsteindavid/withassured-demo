@@ -3,7 +3,7 @@ import { getSessionUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { WorkflowTimeline } from "@/components/dashboard/workflow-timeline";
 import { StatusBadge } from "@/components/dashboard/status-badge";
-import { AdvanceButton } from "@/components/dashboard/credentialing/advance-button";
+import { WorkflowHeartbeat } from "@/components/dashboard/workflow-heartbeat";
 import { formatDate } from "@/lib/format";
 
 interface CredentialingPageProps {
@@ -21,10 +21,10 @@ export default async function CredentialingPage({ searchParams }: CredentialingP
   const cases = await listCredentialingCases(user.orgId);
   const detail = selectedProviderId ? await getCredentialingCaseDetail(selectedProviderId, user.orgId) : null;
 
-  const showAdvance = process.env.NODE_ENV !== "production";
-
   return (
-    <div>
+    <>
+      <WorkflowHeartbeat />
+      <div>
       <h1 className="mb-6 text-2xl font-bold">Provider Credentialing</h1>
 
       {cases.length === 0 ? (
@@ -73,9 +73,6 @@ export default async function CredentialingPage({ searchParams }: CredentialingP
                   </div>
                   <div className="flex items-center gap-2">
                     <StatusBadge status={detail.status} />
-                    {showAdvance && detail.status === "RUNNING" && (
-                      <AdvanceButton workflowId={detail.workflowId} />
-                    )}
                   </div>
                 </div>
                 <WorkflowTimeline steps={detail.steps} />
@@ -89,5 +86,6 @@ export default async function CredentialingPage({ searchParams }: CredentialingP
         </div>
       )}
     </div>
+    </>
   );
 }
