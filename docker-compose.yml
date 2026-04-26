@@ -45,7 +45,7 @@ services:
       sh -c "bunx prisma generate &&
              bunx prisma migrate deploy &&
              bun run db:seed &&
-             bun run dev"
+             exec node node_modules/next/dist/bin/next dev"
 
   studio:
     build:
