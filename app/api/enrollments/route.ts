@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { listPayerEnrollments } from "@/lib/enrollment";
+import { getSessionUser } from "@/lib/auth";
 
 export async function GET() {
-  const enrollments = await prisma.payerEnrollment.findMany();
+  const user = await getSessionUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const enrollments = await listPayerEnrollments(user.orgId);
   return NextResponse.json(enrollments);
 }

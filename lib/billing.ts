@@ -87,6 +87,17 @@ export async function listAllInvoices(orgId: string) {
   );
 }
 
+export async function getInvoiceById(id: string, orgId: string) {
+  const invoice = await prisma.invoice.findUnique({
+    where: { id },
+    include: { events: true },
+  });
+  if (!invoice || invoice.orgId !== orgId) {
+    return null;
+  }
+  return invoice;
+}
+
 const VALID_TYPES = ["CREDENTIALING", "LICENSE", "ENROLLMENT", "MONITORING"] as const;
 
 export function isValidUsageType(type: string): type is (typeof VALID_TYPES)[number] {

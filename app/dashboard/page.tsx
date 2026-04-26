@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/db";
+import { getDashboardMetrics } from "@/lib/enrollment";
 import { getSessionUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 
@@ -9,29 +9,7 @@ export default async function DashboardOverview() {
     redirect("/login");
   }
 
-  const orgId = user.orgId;
-
-  const [totalProviders, activeCredentials, pendingEnrollments, complianceAlerts] = await Promise.all([
-    prisma.provider.count({ where: { orgId } }),
-    prisma.credentialingCase.count({
-      where: {
-        provider: { orgId },
-        status: "COMPLETED",
-      },
-    }),
-    prisma.payerEnrollment.count({
-      where: {
-        provider: { orgId },
-        status: "PENDING",
-      },
-    }),
-    prisma.complianceCheck.count({
-      where: {
-        provider: { orgId },
-        result: "FLAG",
-      },
-    }),
-  ]);
+  const { totalProviders, activeCredentials, pendingEnrollments, complianceAlerts } = await getDashboardMetrics(user.orgId);
 
   return (
     <div>
