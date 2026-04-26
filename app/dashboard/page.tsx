@@ -15,14 +15,14 @@ export default async function DashboardOverview() {
     select: { name: true },
   });
 
-  const { totalProviders, activeCredentials, pendingEnrollments, complianceAlerts } = await getDashboardMetrics(user.orgId);
+  const { totalProviders, activeCredentials, pendingEnrollments, complianceAlerts, expiredLicenses } = await getDashboardMetrics(user.orgId);
 
   return (
     <div>
       <h1 data-testid="dashboard-heading" className="mb-6 text-2xl font-bold">
         {org?.name ?? "Dashboard"} Overview
       </h1>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
         <div className="rounded border p-4" data-testid="metric-total-providers">
           <h3 className="text-sm font-medium text-gray-500">Total Providers</h3>
           <p className="text-2xl font-bold">{totalProviders}</p>
@@ -38,6 +38,10 @@ export default async function DashboardOverview() {
         <div className="rounded border p-4" data-testid="metric-compliance-alerts">
           <h3 className="text-sm font-medium text-gray-500">Compliance Alerts</h3>
           <p className="text-2xl font-bold">{complianceAlerts}</p>
+        </div>
+        <div className="rounded border p-4" data-testid="metric-expired-licenses">
+          <h3 className="text-sm font-medium text-gray-500">Expired Licenses</h3>
+          <p className="text-2xl font-bold">{expiredLicenses}</p>
         </div>
       </div>
     </div>

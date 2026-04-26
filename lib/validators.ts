@@ -1,4 +1,7 @@
 import { z } from "zod";
+import type { LicenseStatus } from "@prisma/client";
+
+const LICENSE_STATUSES: readonly LicenseStatus[] = ["ACTIVE", "EXPIRED", "PENDING", "REVOKED"] as const;
 
 export const loginSchema = z.object({
   email: z.string().email(),
@@ -14,6 +17,8 @@ export const createProviderSchema = z.object({
 });
 
 export const licenseQuerySchema = z.object({
+  status: z.enum(LICENSE_STATUSES).optional(),
+  state: z.string().optional(),
   expiringInDays: z.coerce.number().optional(),
 });
 

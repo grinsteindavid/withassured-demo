@@ -6,6 +6,7 @@ const providerFindMany = mock(async (_args: unknown) => []);
 const providerCount = mock(async (_args: unknown) => 0);
 const credentialingCaseCount = mock(async (_args: unknown) => 0);
 const complianceCheckCount = mock(async (_args: unknown) => 0);
+const licenseCount = mock(async (_args: unknown) => 0);
 
 mock.module("@/lib/db", () => ({
   prisma: {
@@ -13,6 +14,7 @@ mock.module("@/lib/db", () => ({
     provider: { findMany: providerFindMany, count: providerCount },
     credentialingCase: { count: credentialingCaseCount },
     complianceCheck: { count: complianceCheckCount },
+    license: { count: licenseCount },
   },
 }));
 
@@ -45,6 +47,7 @@ describe("getDashboardMetrics", () => {
     credentialingCaseCount.mockResolvedValueOnce(3);
     payerEnrollmentCount.mockResolvedValueOnce(2);
     complianceCheckCount.mockResolvedValueOnce(1);
+    licenseCount.mockResolvedValueOnce(0);
 
     const metrics = await getDashboardMetrics("org_test");
 
@@ -52,5 +55,6 @@ describe("getDashboardMetrics", () => {
     expect(metrics.activeCredentials).toBe(3);
     expect(metrics.pendingEnrollments).toBe(2);
     expect(metrics.complianceAlerts).toBe(1);
+    expect(metrics.expiredLicenses).toBe(0);
   });
 });

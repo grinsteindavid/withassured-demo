@@ -14,7 +14,7 @@ export async function listProviders(orgId: string) {
 }
 
 export async function getDashboardMetrics(orgId: string) {
-  const [totalProviders, activeCredentials, pendingEnrollments, complianceAlerts] = await Promise.all([
+  const [totalProviders, activeCredentials, pendingEnrollments, complianceAlerts, expiredLicenses] = await Promise.all([
     prisma.provider.count({ where: { orgId } }),
     prisma.credentialingCase.count({
       where: {
@@ -34,7 +34,13 @@ export async function getDashboardMetrics(orgId: string) {
         result: "FLAG",
       },
     }),
+    prisma.license.count({
+      where: {
+        provider: { orgId },
+        status: "EXPIRED",
+      },
+    }),
   ]);
 
-  return { totalProviders, activeCredentials, pendingEnrollments, complianceAlerts };
+  return { totalProviders, activeCredentials, pendingEnrollments, complianceAlerts, expiredLicenses };
 }

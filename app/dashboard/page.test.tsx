@@ -15,6 +15,7 @@ mock.module("@/lib/db", () => ({
     credentialingCase: { count },
     payerEnrollment: { count },
     complianceCheck: { count },
+    license: { count },
     organization: { findUnique },
   },
 }));
@@ -63,6 +64,9 @@ describe("DashboardOverview", () => {
     expect(count).toHaveBeenCalledWith({
       where: { provider: { orgId: "org_test" }, result: "FLAG" },
     });
+    expect(count).toHaveBeenCalledWith({
+      where: { provider: { orgId: "org_test" }, status: "EXPIRED" },
+    });
   });
 
   it("renders without error when authenticated", async () => {
@@ -71,6 +75,7 @@ describe("DashboardOverview", () => {
     count.mockResolvedValueOnce(3);
     count.mockResolvedValueOnce(2);
     count.mockResolvedValueOnce(1);
+    count.mockResolvedValueOnce(0);
 
     const page = await DashboardOverview();
     expect(page).toBeTruthy();
@@ -82,11 +87,12 @@ describe("DashboardOverview", () => {
     count.mockResolvedValueOnce(8); // active credentials
     count.mockResolvedValueOnce(5); // pending enrollments
     count.mockResolvedValueOnce(2); // compliance alerts
+    count.mockResolvedValueOnce(1); // expired licenses
 
     const page = await DashboardOverview();
     expect(page).toBeTruthy();
 
     // Verify the correct counts were queried
-    expect(count).toHaveBeenCalledTimes(4);
+    expect(count).toHaveBeenCalledTimes(5);
   });
 });
