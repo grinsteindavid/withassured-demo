@@ -18,13 +18,44 @@ const findUnique = mock(async () => ({
 }));
 const update = mock(async () => ({ id: "p_1", status: "ACTIVE" }));
 const create = mock(async ({ data }: { data: Record<string, unknown> }) => ({ id: "p_new", ...data }));
+const licenseCreate = mock(async ({ data }: { data: Record<string, unknown> }) => ({ id: "l_new", ...data }));
+const licenseUpdate = mock(async ({ where, data }: { where: { id: string }; data: Record<string, unknown> }) => ({ id: where.id, ...data }));
+const credentialingCaseCreate = mock(async ({ data }: { data: Record<string, unknown> }) => ({ id: "c_new", ...data }));
+const recordUsageEventMock = mock(async () => ({ id: "ue_1" }));
+const controlsCreateMock = mock(() => ({}));
 
 mock.module("@/lib/db", () => ({
-  prisma: { provider: { findMany, findUnique, create, update } },
+  prisma: {
+    provider: { findMany, findUnique, create, update },
+    license: { create: licenseCreate, update: licenseUpdate },
+    credentialingCase: { create: credentialingCaseCreate },
+    $transaction: mock(async (fn: (tx: {
+      provider: { create: typeof create };
+      license: { create: typeof licenseCreate; update: typeof licenseUpdate };
+      credentialingCase: { create: typeof credentialingCaseCreate };
+    }) => Promise<unknown>) => {
+      return fn({
+        provider: { create },
+        license: { create: licenseCreate, update: licenseUpdate },
+        credentialingCase: { create: credentialingCaseCreate },
+      });
+    }),
+  },
+}));
+
+mock.module("@/lib/billing", () => ({
+  recordUsageEvent: recordUsageEventMock,
+}));
+
+import * as temporalClient from "@/lib/temporal/client";
+
+mock.module("@/lib/temporal/client", () => ({
+  ...temporalClient,
+  controls: { ...temporalClient.controls, create: controlsCreateMock },
 }));
 
 const { computeProviderStatus } = await import("./providers-shared");
-const { getProviders, listProviders, getProviderDetail, createProvider, recomputeAndUpdateProviderStatus } = await import("./providers");
+const { getProviders, listProviders, getProviderDetail, createProvider, createProviderWithLicenseAndCredentialing, recomputeAndUpdateProviderStatus } = await import("./providers");
 
 describe("getProviders", () => {
   it("returns all providers", async () => {
@@ -302,6 +333,9 @@ describe("createProvider", () => {
       specialty: "Cardiology",
       status: "ACTIVE" as const,
       orgId: "org-test-123",
+      licenseState: "CA",
+      licenseNumber: "L000000",
+      licenseExpiresAt: "2027-01-01",
     };
     const provider = await createProvider(data);
     expect(create).toHaveBeenCalledWith({
@@ -313,6 +347,146 @@ describe("createProvider", () => {
         orgId: "org-test-123",
       },
     });
-    expect(provider).toEqual(expect.objectContaining({ id: "p_new", ...data }));
+    expect(provider).toEqual(expect.objectContaining({
+      id: "p_new",
+      npi: "1234567890",
+      name: "Dr. Test",
+      specialty: "Cardiology",
+      status: "ACTIVE",
+      orgId: "org-test-123",
+    }));
+  });
+});
+
+describe("createProviderWithLicenseAndCredentialing", () => {
+  it("creates provider with PENDING status", async () => {
+    create.mockClear();
+    const data = {
+      npi: "1234567890",
+      name: "Dr. Test",
+      specialty: "Cardiology",
+      status: "ACTIVE" as const,
+      orgId: "org-test-123",
+      licenseState: "NY",
+      licenseNumber: "L123456",
+      licenseExpiresAt: "2027-01-01",
+    };
+    await createProviderWithLicenseAndCredentialing(data, "org_1");
+
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "PENDING" }),
+      }),
+    );
+  });
+
+  it("creates license with PENDING status and correct workflowId", async () => {
+    licenseCreate.mockClear();
+    licenseUpdate.mockClear();
+    const data = {
+      npi: "1234567890",
+      name: "Dr. Test",
+      specialty: "Cardiology",
+      status: "ACTIVE" as const,
+      orgId: "org-test-123",
+      licenseState: "NY",
+      licenseNumber: "L123456",
+      licenseExpiresAt: "2027-01-01",
+    };
+    await createProviderWithLicenseAndCredentialing(data, "org_1");
+
+    expect(licenseCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          state: "NY",
+          number: "L123456",
+          status: "PENDING",
+        }),
+      }),
+    );
+  });
+
+  it("creates credentialing case with IN_PROGRESS status", async () => {
+    credentialingCaseCreate.mockClear();
+    const data = {
+      npi: "1234567890",
+      name: "Dr. Test",
+      specialty: "Cardiology",
+      status: "ACTIVE" as const,
+      orgId: "org-test-123",
+      licenseState: "NY",
+      licenseNumber: "L123456",
+      licenseExpiresAt: "2027-01-01",
+    };
+    await createProviderWithLicenseAndCredentialing(data, "org_1");
+
+    expect(credentialingCaseCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: "IN_PROGRESS",
+          workflowId: expect.stringMatching(/^cred_p_new$/),
+        }),
+      }),
+    );
+  });
+
+  it("records usage events for LICENSE and CREDENTIALING", async () => {
+    recordUsageEventMock.mockClear();
+    const data = {
+      npi: "1234567890",
+      name: "Dr. Test",
+      specialty: "Cardiology",
+      status: "ACTIVE" as const,
+      orgId: "org-test-123",
+      licenseState: "NY",
+      licenseNumber: "L123456",
+      licenseExpiresAt: "2027-01-01",
+    };
+    await createProviderWithLicenseAndCredentialing(data, "org_1");
+
+    expect(recordUsageEventMock).toHaveBeenCalledTimes(2);
+    expect(recordUsageEventMock).toHaveBeenCalledWith("LICENSE", "p_new", "org_1");
+    expect(recordUsageEventMock).toHaveBeenCalledWith("CREDENTIALING", "p_new", "org_1");
+  });
+
+  it("creates temporal workflows for license and credentialing", async () => {
+    controlsCreateMock.mockClear();
+    const data = {
+      npi: "1234567890",
+      name: "Dr. Test",
+      specialty: "Cardiology",
+      status: "ACTIVE" as const,
+      orgId: "org-test-123",
+      licenseState: "NY",
+      licenseNumber: "L123456",
+      licenseExpiresAt: "2027-01-01",
+    };
+    await createProviderWithLicenseAndCredentialing(data, "org_1");
+
+    expect(controlsCreateMock).toHaveBeenCalledTimes(2);
+    expect(controlsCreateMock).toHaveBeenCalledWith(
+      expect.stringMatching(/^lic_l_new$/),
+      { status: "RUNNING", completedCount: 0 },
+    );
+    expect(controlsCreateMock).toHaveBeenCalledWith(
+      expect.stringMatching(/^cred_p_new$/),
+      { status: "RUNNING", completedCount: 0 },
+    );
+  });
+
+  it("returns the created provider", async () => {
+    const data = {
+      npi: "1234567890",
+      name: "Dr. Test",
+      specialty: "Cardiology",
+      status: "ACTIVE" as const,
+      orgId: "org-test-123",
+      licenseState: "NY",
+      licenseNumber: "L123456",
+      licenseExpiresAt: "2027-01-01",
+    };
+    const provider = await createProviderWithLicenseAndCredentialing(data, "org_1");
+    expect(provider.id).toBe("p_new");
+    expect(provider.npi).toBe("1234567890");
   });
 });

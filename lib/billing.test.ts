@@ -1,5 +1,17 @@
 import { describe, it, expect, mock, beforeEach } from "bun:test";
 
+// Use the real `@/lib/stripe-mock` module directly. Its functions are pure
+// in-memory operations on a globalThis singleton; resetMockState() in
+// beforeEach gives us per-test isolation. Avoiding mock.module on this
+// alias here is intentional — under Bun 1.3.x, partial mock.module
+// registrations leak across files and corrupt lib/stripe-mock.test.ts,
+// which tests the real implementation.
+import {
+  resetMockState,
+  getSubscriptionItems,
+  createInvoice,
+} from "@/lib/stripe-mock";
+
 const usageFindMany = mock(async (_args: { where: Record<string, unknown> }) => [
   { type: "CREDENTIALING", unitCents: 19_900 },
   { type: "CREDENTIALING", unitCents: 19_900 },
@@ -26,73 +38,6 @@ const subscriptionFindUnique = mock(async (_args: { where: { orgId: string } }) 
   plan: "STARTUP",
   status: "ACTIVE",
 }) as unknown);
-
-// Local mock state for stripe-mock functions
-const mockMeterEvents = new Map<string, Array<{ event_name: string; value: number }>>();
-const mockInvoices = new Map<string, { id: string; customer: string; status: "draft" | "open" | "paid" | "void"; amount_due: number; amount_paid: number; lines: Array<{ description: string; amount: number; quantity: number }>; created_at: string }>();
-let mockInvoiceCounter = 0;
-
-const mockPayInvoice = mock((invoiceId: string) => {
-  const invoice = mockInvoices.get(invoiceId);
-  if (!invoice) return null;
-  if (invoice.status !== "open" && invoice.status !== "draft") return null;
-
-  invoice.status = "paid";
-  invoice.amount_paid = invoice.amount_due;
-  return { invoice, paymentIntentId: `pi_mock_${invoiceId}` };
-});
-
-const mockCreateMeterEvent = mock((params: { event_name: string; customer: string; value?: number }) => {
-  const existing = mockMeterEvents.get(params.customer) || [];
-  existing.push({ event_name: params.event_name, value: params.value ?? 1 });
-  mockMeterEvents.set(params.customer, existing);
-  return { id: `me_mock_${Date.now()}`, ...params };
-});
-
-const mockResetMockState = mock(() => {
-  mockMeterEvents.clear();
-  mockInvoices.clear();
-  mockInvoiceCounter = 0;
-});
-
-const mockGetSubscriptionItems = mock((customerId: string) => {
-  const events = mockMeterEvents.get(customerId) || [];
-  const counts: Record<string, number> = {};
-  for (const event of events) {
-    counts[event.event_name] = (counts[event.event_name] || 0) + event.value;
-  }
-  return counts;
-});
-
-const mockCreateInvoice = mock((params: { customerId: string; lines: Array<{ description: string; amount: number; quantity: number }>; autoAdvance?: boolean }) => {
-  mockInvoiceCounter++;
-  const id = `inv_mock_${mockInvoiceCounter}`;
-  const amount_due = params.lines.reduce((sum: number, line) => sum + line.amount, 0);
-
-  const invoice = {
-    id,
-    customer: params.customerId,
-    status: (params.autoAdvance ? "open" : "draft") as "draft" | "open" | "paid" | "void",
-    amount_due,
-    amount_paid: 0,
-    lines: params.lines,
-    created_at: new Date().toISOString(),
-  };
-
-  mockInvoices.set(id, invoice);
-  return invoice;
-});
-
-mock.module("@/lib/stripe-mock", () => ({
-  payInvoice: mockPayInvoice,
-  createMeterEvent: mockCreateMeterEvent,
-  resetMockState: mockResetMockState,
-  getSubscriptionItems: mockGetSubscriptionItems,
-  createInvoice: mockCreateInvoice,
-}));
-
-// Import mocked functions after module is mocked
-const { resetMockState, getSubscriptionItems, createInvoice } = await import("@/lib/stripe-mock");
 
 mock.module("@/lib/db", () => ({
   prisma: {

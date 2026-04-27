@@ -4,6 +4,7 @@ import { listProviders, getProviderDetail } from "@/lib/providers";
 import { ProviderFilters } from "@/components/dashboard/roster/provider-filters";
 import { ProviderRow } from "@/components/dashboard/roster/provider-row";
 import { ProviderDetail } from "@/components/dashboard/roster/provider-detail";
+import { AddProviderDialog } from "@/components/dashboard/roster/add-provider-dialog";
 import { DataTable } from "@/components/dashboard/data-table";
 
 interface RosterPageProps {
@@ -28,7 +29,10 @@ export default async function RosterPage({ searchParams }: RosterPageProps) {
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-bold">Provider Roster</h1>
+      <div className="mb-6 flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Provider Roster</h1>
+        <AddProviderDialog />
+      </div>
 
       <div className="grid grid-cols-12 gap-6">
         <aside className="col-span-12 md:col-span-5 lg:col-span-4">

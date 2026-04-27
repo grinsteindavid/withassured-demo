@@ -14,6 +14,9 @@ export const createProviderSchema = z.object({
   specialty: z.string().min(1),
   status: z.enum(["ACTIVE", "INACTIVE", "PENDING"]),
   orgId: z.string().optional(),
+  licenseState: z.string().min(1),
+  licenseNumber: z.string().min(1),
+  licenseExpiresAt: z.string().date(),
 });
 
 export const licenseQuerySchema = z.object({

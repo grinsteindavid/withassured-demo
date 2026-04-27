@@ -26,6 +26,9 @@ describe("createProviderSchema", () => {
       specialty: "Cardiology",
       status: "ACTIVE",
       orgId: "org-123",
+      licenseState: "CA",
+      licenseNumber: "L123456",
+      licenseExpiresAt: "2027-01-01",
     });
     expect(result.success).toBe(true);
   });
@@ -37,6 +40,9 @@ describe("createProviderSchema", () => {
       specialty: "Cardiology",
       status: "ACTIVE",
       orgId: "org-123",
+      licenseState: "CA",
+      licenseNumber: "L123456",
+      licenseExpiresAt: "2027-01-01",
     });
     expect(result.success).toBe(false);
   });
@@ -47,6 +53,19 @@ describe("createProviderSchema", () => {
       name: "Dr. Test",
       specialty: "Cardiology",
       orgId: "org-123",
+      licenseState: "CA",
+      licenseNumber: "L123456",
+      licenseExpiresAt: "2027-01-01",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects missing license fields", () => {
+    const result = createProviderSchema.safeParse({
+      npi: "1234567890",
+      name: "Dr. Test",
+      specialty: "Cardiology",
+      status: "ACTIVE",
     });
     expect(result.success).toBe(false);
   });
@@ -57,6 +76,9 @@ describe("createProviderSchema", () => {
       name: "Dr. Test",
       specialty: "Cardiology",
       status: "ACTIVE",
+      licenseState: "CA",
+      licenseNumber: "L123456",
+      licenseExpiresAt: "2027-01-01",
     });
     expect(result.success).toBe(true);
   });

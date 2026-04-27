@@ -10,6 +10,8 @@ import {
   type ProviderSummary,
   type ProviderWithRelations,
 } from "@/lib/providers-shared";
+import { recordUsageEvent } from "@/lib/billing";
+import { controls } from "@/lib/temporal/client";
 
 export { computeProviderStatus };
 export type { ProviderDetail, ProviderSummary };
@@ -128,4 +130,56 @@ export async function createProvider(data: z.infer<typeof createProviderSchema>)
       orgId: data.orgId || "",
     },
   });
+}
+
+export async function createProviderWithLicenseAndCredentialing(
+  data: z.infer<typeof createProviderSchema>,
+  orgId: string,
+) {
+  const result = await prisma.$transaction(async (tx) => {
+    const provider = await tx.provider.create({
+      data: {
+        npi: data.npi,
+        name: data.name,
+        specialty: data.specialty,
+        status: "PENDING",
+        orgId,
+      },
+    });
+
+    const license = await tx.license.create({
+      data: {
+        providerId: provider.id,
+        state: data.licenseState,
+        number: data.licenseNumber,
+        expiresAt: new Date(data.licenseExpiresAt),
+        status: "PENDING",
+      },
+    });
+
+    const licenseWithWorkflow = await tx.license.update({
+      where: { id: license.id },
+      data: { workflowId: `lic_${license.id}` },
+    });
+
+    const credentialingCase = await tx.credentialingCase.create({
+      data: {
+        providerId: provider.id,
+        workflowId: `cred_${provider.id}`,
+        status: "IN_PROGRESS",
+      },
+    });
+
+    return { provider, license: licenseWithWorkflow, credentialingCase };
+  });
+
+  await Promise.all([
+    recordUsageEvent("LICENSE", result.provider.id, orgId),
+    recordUsageEvent("CREDENTIALING", result.provider.id, orgId),
+  ]);
+
+  controls.create(result.license.workflowId!, { status: "RUNNING", completedCount: 0 });
+  controls.create(`cred_${result.provider.id}`, { status: "RUNNING", completedCount: 0 });
+
+  return result.provider;
 }

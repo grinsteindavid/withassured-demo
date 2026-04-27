@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { listProviders, createProvider } from "@/lib/providers";
+import { listProviders, createProviderWithLicenseAndCredentialing } from "@/lib/providers";
 import { createProviderSchema, providerQuerySchema } from "@/lib/validators";
 import { getSessionUser } from "@/lib/auth";
 import { requireActiveSubscription, subscriptionBlockedResponse } from "@/lib/subscription-guard";
@@ -44,6 +44,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
 
-  const provider = await createProvider({ ...result.data, orgId: user.orgId });
+  const provider = await createProviderWithLicenseAndCredentialing(result.data, user.orgId);
   return NextResponse.json(provider, { status: 201 });
 }

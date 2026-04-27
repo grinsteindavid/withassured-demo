@@ -1,4 +1,16 @@
-import { describe, it, expect, mock, beforeEach } from "bun:test";
+import { describe, it, expect, mock, spyOn, beforeEach, afterAll } from "bun:test";
+import * as stripeMock from "@/lib/stripe-mock";
+
+// Use the real `@/lib/stripe-mock` module directly and spy on the one
+// function whose call signature we assert against. Avoiding mock.module on
+// this alias is intentional — under Bun 1.3.x partial mock.module
+// registrations leak across test files and corrupt
+// lib/stripe-mock.test.ts, which tests the real implementation.
+const stripeDeletePaymentMethod = spyOn(stripeMock, "deletePaymentMethod");
+
+afterAll(() => {
+  stripeDeletePaymentMethod.mockRestore();
+});
 
 // Prisma method mocks
 const paymentMethodFindFirst = mock(async (_args: unknown) => null as unknown);
@@ -25,23 +37,6 @@ mock.module("@/lib/db", () => ({
       create: paymentMethodCreate,
     },
   },
-}));
-
-// Stripe-mock module mocks
-const stripeDeletePaymentMethod = mock((_id: string) => true);
-const stripeListPaymentMethods = mock((_orgId: string) => [] as unknown[]);
-const stripeSetDefaultPaymentMethod = mock((_id: string) => undefined);
-const stripeCreatePaymentMethod = mock(() => ({}));
-
-mock.module("@/lib/stripe-mock", () => ({
-  createPaymentMethod: stripeCreatePaymentMethod,
-  listPaymentMethods: stripeListPaymentMethods,
-  setDefaultPaymentMethod: stripeSetDefaultPaymentMethod,
-  deletePaymentMethod: stripeDeletePaymentMethod,
-  createSubscription: mock(),
-  getSubscription: mock(),
-  cancelSubscription: mock(),
-  updateSubscription: mock(),
 }));
 
 const { removePaymentMethod, listPaymentMethods, setDefaultPaymentMethod } = await import(
@@ -109,12 +104,10 @@ describe("removePaymentMethod (soft-delete)", () => {
 describe("listPaymentMethods (soft-delete filter)", () => {
   beforeEach(() => {
     paymentMethodFindMany.mockClear();
-    stripeListPaymentMethods.mockClear();
   });
 
   it("filters out soft-deleted records via deletedAt: null", async () => {
     paymentMethodFindMany.mockResolvedValueOnce([] as never);
-    stripeListPaymentMethods.mockReturnValueOnce([] as never);
 
     await listPaymentMethods("org_1");
     expect(paymentMethodFindMany).toHaveBeenCalledWith(
@@ -130,7 +123,6 @@ describe("setDefaultPaymentMethod (soft-delete filter)", () => {
     paymentMethodFindFirst.mockClear();
     paymentMethodUpdate.mockClear();
     paymentMethodUpdateMany.mockClear();
-    stripeSetDefaultPaymentMethod.mockClear();
   });
 
   it("returns false for soft-deleted method", async () => {
