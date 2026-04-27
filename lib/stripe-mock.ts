@@ -304,6 +304,7 @@ export async function syncStripeMockFromDB(): Promise<void> {
       customer: pm.orgId,
       isDefault: pm.isDefault,
       created_at: pm.createdAt.toISOString(),
+      dbId: pm.id,
     });
   }
   state.paymentMethodCounter = dbPaymentMethods.length;
