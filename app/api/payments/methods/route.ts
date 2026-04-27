@@ -29,16 +29,20 @@ export async function POST(request: Request) {
   const body = await request.json();
   const { type, last4, expiryMonth, expiryYear, brand, setDefault } = body;
 
-  if (!type || !last4 || !expiryMonth || !expiryYear) {
+  if (!type || !last4) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+  }
+
+  if (type === "CARD" && (!expiryMonth || !expiryYear)) {
+    return NextResponse.json({ error: "Card expiry is required" }, { status: 400 });
   }
 
   try {
     const method = await addPaymentMethod(user.orgId, {
       type,
       last4,
-      expiryMonth: parseInt(expiryMonth),
-      expiryYear: parseInt(expiryYear),
+      expiryMonth: expiryMonth ? parseInt(expiryMonth) : 0,
+      expiryYear: expiryYear ? parseInt(expiryYear) : 0,
       brand,
       setDefault,
     });

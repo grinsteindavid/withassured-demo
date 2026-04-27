@@ -26,8 +26,8 @@ export type PaymentMethodDetails = {
   id: string;
   type: "card" | "ach";
   last4: string;
-  expiryMonth: number;
-  expiryYear: number;
+  expiryMonth?: number;
+  expiryYear?: number;
   brand?: string;
   customer: string;
   isDefault: boolean;
@@ -163,8 +163,8 @@ export function createPaymentMethod(params: {
   customerId: string;
   type: "card" | "ach";
   last4: string;
-  expiryMonth: number;
-  expiryYear: number;
+  expiryMonth?: number;
+  expiryYear?: number;
   brand?: string;
   setDefault?: boolean;
 }): PaymentMethodDetails {
@@ -184,8 +184,8 @@ export function createPaymentMethod(params: {
     id,
     type: params.type,
     last4: params.last4,
-    expiryMonth: params.expiryMonth,
-    expiryYear: params.expiryYear,
+    expiryMonth: params.expiryMonth ?? 0,
+    expiryYear: params.expiryYear ?? 0,
     brand: params.brand,
     customer: params.customerId,
     isDefault: params.setDefault ?? false,

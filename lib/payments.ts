@@ -23,8 +23,8 @@ export async function addPaymentMethod(
   params: {
     type: "CARD" | "ACH";
     last4: string;
-    expiryMonth: number;
-    expiryYear: number;
+    expiryMonth?: number;
+    expiryYear?: number;
     brand?: string;
     setDefault?: boolean;
   },
