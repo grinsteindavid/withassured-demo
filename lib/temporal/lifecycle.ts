@@ -33,69 +33,69 @@ async function recomputeForWorkflow(workflowId: string) {
 }
 
 export function registerDbSync() {
-  controls.onComplete = (workflowId) => {
+  controls.onComplete = async (workflowId) => {
     console.log(`[workflow] ${workflowId} sync → DB updated to COMPLETED/APPROVED/ACTIVE`);
-    prisma.credentialingCase
-      .updateMany({ where: { workflowId, status: "IN_PROGRESS" }, data: { status: "COMPLETED" } })
-      .catch(() => {});
-    prisma.payerEnrollment
-      .updateMany({ where: { workflowId, status: "PENDING" }, data: { status: "APPROVED" } })
-      .catch(() => {});
-    prisma.license
-      .updateMany({ where: { workflowId, status: "PENDING" }, data: { status: "ACTIVE" } })
-      .catch(() => {});
+    await Promise.all([
+      prisma.credentialingCase
+        .updateMany({ where: { workflowId, status: "IN_PROGRESS" }, data: { status: "COMPLETED" } })
+        .catch(() => {}),
+      prisma.payerEnrollment
+        .updateMany({ where: { workflowId, status: "PENDING" }, data: { status: "APPROVED" } })
+        .catch(() => {}),
+      prisma.license
+        .updateMany({ where: { workflowId, status: "PENDING" }, data: { status: "ACTIVE" } })
+        .catch(() => {}),
+    ]);
 
     // Handle compliance workflow completion - check result and revoke if FLAG
     if (workflowId.startsWith("comp_")) {
       const checkId = workflowId.replace("comp_", "");
-      prisma.complianceCheck
+      const check = await prisma.complianceCheck
         .findUnique({ where: { id: checkId } })
-        .then((check) => {
-          if (check && check.result === "FLAG") {
-            prisma.license
-              .updateMany({ where: { providerId: check.providerId, status: "ACTIVE" }, data: { status: "REVOKED" } })
-              .catch(() => {});
-            console.log(`[compliance] License revoked for provider ${check.providerId} (FLAG result found)`);
-          }
-        })
-        .catch(() => {});
+        .catch(() => null);
+      if (check && check.result === "FLAG") {
+        await prisma.license
+          .updateMany({ where: { providerId: check.providerId, status: "ACTIVE" }, data: { status: "REVOKED" } })
+          .catch(() => {});
+        console.log(`[compliance] License revoked for provider ${check.providerId} (FLAG result found)`);
+      }
     }
 
-    recomputeForWorkflow(workflowId);
+    await recomputeForWorkflow(workflowId);
   };
 
-  controls.onFail = (workflowId) => {
-    console.log(`[workflow] ${workflowId} sync → DB updated to FAILED/DENIED/REVOKED`);
-    prisma.credentialingCase
-      .updateMany({ where: { workflowId, status: "IN_PROGRESS" }, data: { status: "FAILED" } })
-      .catch(() => {});
-    prisma.payerEnrollment
-      .updateMany({ where: { workflowId, status: "PENDING" }, data: { status: "DENIED" } })
-      .catch(() => {});
-    prisma.license
-      .updateMany({ where: { workflowId, status: "PENDING" }, data: { status: "REVOKED" } })
-      .catch(() => {});
+  controls.onFail = async (workflowId, reason: string) => {
+    console.log(`[workflow] ${workflowId} sync → DB updated to FAILED/DENIED/REVOKED (${reason})`);
+    await Promise.all([
+      prisma.credentialingCase
+        .updateMany({ where: { workflowId, status: "IN_PROGRESS" }, data: { status: "FAILED" } })
+        .catch(() => {}),
+      prisma.payerEnrollment
+        .updateMany({ where: { workflowId, status: "PENDING" }, data: { status: "DENIED" } })
+        .catch(() => {}),
+      prisma.license
+        .updateMany({ where: { workflowId, status: "PENDING" }, data: { status: "REVOKED" } })
+        .catch(() => {}),
+    ]);
 
     // Handle compliance workflow failure - revoke license and update check result
     if (workflowId.startsWith("comp_")) {
       const checkId = workflowId.replace("comp_", "");
-      prisma.complianceCheck
+      const check = await prisma.complianceCheck
         .findUnique({ where: { id: checkId } })
-        .then((check) => {
-          if (check) {
-            prisma.license
-              .updateMany({ where: { providerId: check.providerId, status: "ACTIVE" }, data: { status: "REVOKED" } })
-              .catch(() => {});
-            prisma.complianceCheck
-              .update({ where: { id: checkId }, data: { result: "FLAG" } })
-              .catch(() => {});
-            console.log(`[compliance] License revoked and check result set to FLAG for provider ${check.providerId}`);
-          }
-        })
-        .catch(() => {});
+        .catch(() => null);
+      if (check) {
+        await prisma.license
+          .updateMany({ where: { providerId: check.providerId, status: "ACTIVE" }, data: { status: "REVOKED" } })
+          .catch(() => {});
+        await prisma.complianceCheck
+          .update({ where: { id: checkId }, data: { result: "FLAG" } })
+          .catch(() => {});
+        console.log(`[compliance] License revoked and check result set to FLAG for provider ${check.providerId}`);
+      }
     }
 
-    recomputeForWorkflow(workflowId);
+    await recomputeForWorkflow(workflowId);
   };
 }
 
