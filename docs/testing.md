@@ -59,6 +59,28 @@ Tests are colocated with source as `*.test.ts` / `*.test.tsx`. Current coverage:
 - **Time / `setInterval`** — `spyOn(globalThis, "setInterval")` and assert callback registration; see `lib/temporal/lifecycle.test.ts` for the pattern.
 - **Fixtures** — `test/fixtures/index.ts` exports `makeProvider`, `makeWorkflow`, `makeInvoice`. Builders take overrides.
 
+### Cross-file `mock.module` pitfalls (Bun 1.3.x)
+
+Bun's `mock.module(specifier, factory)` registers process-wide. The registration persists across test files and **whichever file's factory is registered first wins the module cache** for any later static import resolving to the same specifier. This causes two failure modes that are easy to hit and painful to debug:
+
+1. **Partial mock corrupts another file's static imports.** If `a.test.ts` does `mock.module("@/lib/foo", () => ({ bar: mockBar }))` and `b.test.ts` does `import { bar, baz } from "@/lib/foo"`, then `b.test.ts` fails at module evaluation with `SyntaxError: Export named 'baz' not found`. We hit this with `@/lib/stripe-mock` — see the inline comment in `lib/billing.test.ts`.
+2. **Mocked function identities leak into the file that tests the real module.** `lib/stripe-mock.test.ts` imports the real module statically; if `lib/billing.test.ts` had registered a partial mock first, the destructured bindings in `stripe-mock.test.ts` would be the mocked stubs, not the real implementations. `afterAll` cleanup does **not** save you — the next file's static imports are evaluated before the previous file's `afterAll` runs.
+
+**Rules of thumb:**
+
+- **Prefer `spyOn(realModule, "fn")`** over `mock.module` whenever you only need to assert call arguments. It doesn't pollute the cache. Example: `lib/payments.test.ts` spies on `stripeMock.deletePaymentMethod`.
+- **Use the real module directly** when the test-only override would just re-implement the real behavior. Call the real `resetMockState()` in `beforeEach` for isolation. Example: `lib/billing.test.ts` imports `createInvoice`, `payInvoice`, etc. straight from `@/lib/stripe-mock`.
+- **If you must `mock.module` an alias**, spread the real module first so every export stays defined:
+  ```ts
+  import * as temporalClient from "@/lib/temporal/client";
+  mock.module("@/lib/temporal/client", () => ({
+    ...temporalClient,
+    controls: { ...temporalClient.controls, create: controlsCreateMock },
+  }));
+  ```
+  See `lib/providers.test.ts` for a working example. Never register a `mock.module` factory that returns a partial subset of a module also imported elsewhere in the suite.
+- **Files that test the real module** (e.g. `lib/stripe-mock.test.ts`) should not be mocked by anyone else. Audit other tests' `mock.module` calls before adding new ones.
+
 ### Commands
 
 ```bash
