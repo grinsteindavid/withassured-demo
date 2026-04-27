@@ -1,8 +1,34 @@
 import { prisma } from "@/lib/db";
 import { controls } from "./client";
 import { WORKFLOW_DEFINITIONS, inferType } from "./fixtures";
+import { recomputeAndUpdateProviderStatus } from "@/lib/providers";
 
 // ─── DB Sync: mock terminal state → PostgreSQL ──────────────────────────────
+
+async function recomputeForWorkflow(workflowId: string) {
+  try {
+    const [cases, enrollments, licenses] = await Promise.all([
+      prisma.credentialingCase.findMany({ where: { workflowId }, select: { providerId: true } }),
+      prisma.payerEnrollment.findMany({ where: { workflowId }, select: { providerId: true } }),
+      prisma.license.findMany({ where: { workflowId }, select: { providerId: true } }),
+    ]);
+    const providerIds = new Set([
+      ...cases.map((c) => c.providerId),
+      ...enrollments.map((e) => e.providerId),
+      ...licenses.map((l) => l.providerId),
+    ]);
+    if (workflowId.startsWith("comp_")) {
+      const checkId = workflowId.replace("comp_", "");
+      const check = await prisma.complianceCheck.findUnique({ where: { id: checkId } });
+      if (check) providerIds.add(check.providerId);
+    }
+    for (const pid of providerIds) {
+      await recomputeAndUpdateProviderStatus(pid);
+    }
+  } catch {
+    // silently ignore
+  }
+}
 
 export function registerDbSync() {
   controls.onComplete = (workflowId) => {
@@ -32,6 +58,8 @@ export function registerDbSync() {
         })
         .catch(() => {});
     }
+
+    recomputeForWorkflow(workflowId);
   };
 
   controls.onFail = (workflowId) => {
@@ -64,6 +92,8 @@ export function registerDbSync() {
         })
         .catch(() => {});
     }
+
+    recomputeForWorkflow(workflowId);
   };
 }
 

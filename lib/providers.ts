@@ -35,6 +35,50 @@ export type ProviderDetail = ProviderSummary & {
   complianceChecks: ComplianceCheck[];
 };
 
+export function computeProviderStatus(
+  provider: Pick<ProviderWithRelations, "licenses" | "enrollments" | "complianceChecks">,
+): ProviderStatus {
+  const hasExpiredOrRevokedLicense = provider.licenses.some(
+    (l) => l.status === "EXPIRED" || l.status === "REVOKED",
+  );
+  const hasDeniedEnrollment = provider.enrollments.some(
+    (e) => e.status === "DENIED",
+  );
+  const hasComplianceFlag = provider.complianceChecks.some(
+    (c) => c.result === "FLAG",
+  );
+
+  if (hasExpiredOrRevokedLicense || hasDeniedEnrollment || hasComplianceFlag) {
+    return "INACTIVE";
+  }
+
+  const hasPendingLicense = provider.licenses.some(
+    (l) => l.status === "PENDING",
+  );
+  const hasPendingEnrollment = provider.enrollments.some(
+    (e) => e.status === "PENDING" || e.status === "SUBMITTED",
+  );
+
+  if (hasPendingLicense || hasPendingEnrollment) {
+    return "PENDING";
+  }
+
+  return "ACTIVE";
+}
+
+export async function recomputeAndUpdateProviderStatus(providerId: string): Promise<ProviderStatus> {
+  const provider = await prisma.provider.findUnique({
+    where: { id: providerId },
+    include: { licenses: true, enrollments: true, complianceChecks: true },
+  }) as ProviderWithRelations | null;
+
+  if (!provider) return "INACTIVE";
+
+  const status = computeProviderStatus(provider);
+  await prisma.provider.update({ where: { id: providerId }, data: { status } });
+  return status;
+}
+
 export async function getProviders() {
   return prisma.provider.findMany();
 }
@@ -49,14 +93,9 @@ export async function listProviders(
 ): Promise<ProviderSummary[]> {
   const where: {
     orgId: string;
-    status?: ProviderStatus;
     specialty?: string;
     OR?: Array<{ name: { contains: string; mode: "insensitive" } } | { npi: { contains: string; mode: "insensitive" } }>;
   } = { orgId };
-
-  if (filters?.status) {
-    where.status = filters.status;
-  }
 
   if (filters?.specialty) {
     where.specialty = filters.specialty;
@@ -79,17 +118,23 @@ export async function listProviders(
     orderBy: { name: "asc" },
   }) as ProviderWithRelations[];
 
-  return providers.map((p) => ({
+  const mapped = providers.map((p) => ({
     id: p.id,
     npi: p.npi,
     name: p.name,
     specialty: p.specialty,
-    status: p.status,
+    status: computeProviderStatus(p),
     licenseCount: p.licenses.length,
     enrollmentCount: p.enrollments.length,
     hasComplianceFlag: p.complianceChecks.some((c) => c.result === "FLAG"),
     createdAt: p.createdAt,
   }));
+
+  if (filters?.status) {
+    return mapped.filter((p) => p.status === filters.status);
+  }
+
+  return mapped;
 }
 
 export async function getProviderDetail(
@@ -107,12 +152,14 @@ export async function getProviderDetail(
 
   if (!provider || provider.orgId !== orgId) return null;
 
+  const status = computeProviderStatus(provider);
+
   return {
     id: provider.id,
     npi: provider.npi,
     name: provider.name,
     specialty: provider.specialty,
-    status: provider.status,
+    status,
     licenseCount: provider.licenses.length,
     enrollmentCount: provider.enrollments.length,
     hasComplianceFlag: provider.complianceChecks.some((c) => c.result === "FLAG"),
