@@ -1,3 +1,5 @@
+import "server-only";
+
 import { prisma } from "@/lib/db";
 import { controls } from "./client";
 import { WORKFLOW_DEFINITIONS, inferType } from "./fixtures";

@@ -13,7 +13,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   }
 
   const { id } = await params;
-  const success = await removePaymentMethod(user.orgId, id);
+  const success = await removePaymentMethod(user.orgId, id, user.userId);
 
   if (!success) {
     return NextResponse.json({ error: "Payment method not found" }, { status: 404 });

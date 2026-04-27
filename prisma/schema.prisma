@@ -1,3 +1,10 @@
+// Soft-delete convention for compliance-sensitive models:
+// Never call prisma.<model>.delete() for tables that require audit trails.
+// Instead, add nullable `deletedAt DateTime?` and `deletedBy String?` columns,
+// and use `update` to set these fields. See lib/soft-delete.ts for helpers.
+// Apply this pattern to PaymentMethod, and future models like Subscription,
+// Provider, License, PayerEnrollment, ComplianceCheck as needed.
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -212,6 +219,8 @@ model PaymentMethod {
   organization          Organization       @relation(fields: [orgId], references: [id], onDelete: Cascade)
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
+  deletedAt            DateTime?
+  deletedBy            String?
 }
 
 model Subscription {

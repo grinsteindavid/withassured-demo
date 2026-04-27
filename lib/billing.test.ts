@@ -36,7 +36,8 @@ mock.module("@/lib/db", () => ({
   },
 }));
 
-const { rollupUsage, periodRange, getCurrentUsage, listAllInvoices, recordUsageEvent, processInvoicePayment, getInvoiceById, isValidUsageType } = await import("./billing");
+const { rollupUsage, periodRange, isValidUsageType } = await import("./billing-formulas");
+const { getCurrentUsage, listAllInvoices, recordUsageEvent, processInvoicePayment, getInvoiceById } = await import("./billing");
 
 beforeEach(() => {
   resetMockState();

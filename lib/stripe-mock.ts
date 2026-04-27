@@ -32,6 +32,7 @@ export type PaymentMethodDetails = {
   customer: string;
   isDefault: boolean;
   created_at: string;
+  dbId?: string;
 };
 
 export type Subscription = {
@@ -288,8 +289,10 @@ export function updateSubscription(params: {
 export async function syncStripeMockFromDB(): Promise<void> {
   const { prisma } = await import("@/lib/db");
 
-  // Sync PaymentMethods
-  const dbPaymentMethods = await (prisma as any).paymentMethod.findMany();
+  // Sync PaymentMethods (exclude soft-deleted)
+  const dbPaymentMethods = await (prisma as any).paymentMethod.findMany({
+    where: { deletedAt: null },
+  });
   for (const pm of dbPaymentMethods) {
     state.paymentMethods.set(pm.stripePaymentMethodId, {
       id: pm.stripePaymentMethodId,

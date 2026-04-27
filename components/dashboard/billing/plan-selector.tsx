@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { SUBSCRIPTION_PRICING } from "@/lib/payments";
+import { SUBSCRIPTION_PRICING } from "@/lib/subscription-plans";
 import { useRouter } from "next/navigation";
 
 export function PlanSelector({ currentPlan, onClose }: { currentPlan: string | null; onClose: () => void }) {

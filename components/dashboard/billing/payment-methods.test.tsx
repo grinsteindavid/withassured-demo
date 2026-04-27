@@ -9,6 +9,7 @@ mock.module("next/navigation", () => ({
 
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { PaymentMethodDetails } from "@/lib/stripe-mock";
 
 const { PaymentMethods } = await import("./payment-methods");
 
@@ -177,22 +178,61 @@ describe("<PaymentMethods />", () => {
   });
 
   it("hides set default button for default method", () => {
-    const methods = [
+    const methods: PaymentMethodDetails[] = [
       {
         id: "pm_1",
-        type: "card" as const,
+        type: "card",
         last4: "4242",
         expiryMonth: 12,
         expiryYear: 2026,
         brand: "Visa",
-        customer: "cust_1",
+        customer: "org_1",
         isDefault: true,
-        created_at: "2024-01-01T00:00:00Z",
+        created_at: "2026-01-01T00:00:00Z",
       },
     ];
 
     render(<PaymentMethods methods={methods} />);
 
     expect(screen.queryByText("Set Default")).toBeNull();
+  });
+
+  it("renders card with empty last4 and 0 expiry", () => {
+    const methods: PaymentMethodDetails[] = [
+      {
+        id: "pm_1",
+        type: "card",
+        last4: "",
+        expiryMonth: 0,
+        expiryYear: 0,
+        customer: "org_1",
+        isDefault: false,
+        created_at: "2026-01-01T00:00:00Z",
+      },
+    ];
+
+    render(<PaymentMethods methods={methods} />);
+
+    expect(screen.getByText(/Card/)).toBeTruthy();
+    expect(screen.getByText(/Expires 0\/0/)).toBeTruthy();
+  });
+
+  it("renders ACH with last4 digits", () => {
+    const methods: PaymentMethodDetails[] = [
+      {
+        id: "pm_1",
+        type: "ach",
+        last4: "1111",
+        customer: "org_1",
+        isDefault: false,
+        created_at: "2026-01-01T00:00:00Z",
+      },
+    ];
+
+    render(<PaymentMethods methods={methods} />);
+
+    expect(screen.getByText(/ACH/)).toBeTruthy();
+    expect(screen.getByText(/1111/)).toBeTruthy();
+    expect(screen.queryByText(/Expires/)).toBeNull();
   });
 });

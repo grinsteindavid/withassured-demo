@@ -23,7 +23,8 @@ mock.module("@/lib/db", () => ({
   prisma: { provider: { findMany, findUnique, create, update } },
 }));
 
-const { getProviders, listProviders, getProviderDetail, createProvider, computeProviderStatus, recomputeAndUpdateProviderStatus } = await import("./providers");
+const { computeProviderStatus } = await import("./providers-shared");
+const { getProviders, listProviders, getProviderDetail, createProvider, recomputeAndUpdateProviderStatus } = await import("./providers");
 
 describe("getProviders", () => {
   it("returns all providers", async () => {

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { recordUsageEvent, isValidUsageType } from "@/lib/billing";
+import { recordUsageEvent } from "@/lib/billing";
+import { isValidUsageType } from "@/lib/billing-formulas";
 
 export async function POST(request: Request) {
   const body = (await request.json()) as { type?: string; providerId?: string };

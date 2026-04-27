@@ -1,4 +1,7 @@
+import "server-only";
+
 import { prisma } from "@/lib/db";
+import { softDeleteData, softDeleteFilter } from "@/lib/soft-delete";
 import {
   createPaymentMethod,
   listPaymentMethods as stripeListPaymentMethods,
@@ -11,12 +14,6 @@ import {
   type PaymentMethodDetails,
   type Subscription,
 } from "@/lib/stripe-mock";
-
-export const SUBSCRIPTION_PRICING = {
-  STARTUP: { platformFeeCents: 29_900, name: "Startup" },
-  GROWTH: { platformFeeCents: 99_900, name: "Growth" },
-  ENTERPRISE: { platformFeeCents: 299_900, name: "Enterprise" },
-} as const;
 
 export async function addPaymentMethod(
   orgId: string,
@@ -53,32 +50,33 @@ export async function addPaymentMethod(
 
 export async function listPaymentMethods(orgId: string): Promise<PaymentMethodDetails[]> {
   const dbMethods = await prisma.paymentMethod.findMany({
-    where: { orgId },
+    where: { orgId, ...softDeleteFilter() },
     orderBy: { createdAt: "desc" },
   });
 
   const stripeMethods = stripeListPaymentMethods(orgId);
 
   // Merge DB references with Stripe details
-  return dbMethods
-    .map((dbMethod: { stripePaymentMethodId: string }) => {
+  const methods = dbMethods
+    .map((dbMethod) => {
       const stripeMethod = stripeMethods.find((sm) => sm.id === dbMethod.stripePaymentMethodId);
       if (!stripeMethod) return null;
-      return stripeMethod;
+      return { ...stripeMethod, dbId: dbMethod.id };
     })
-    .filter((m): m is PaymentMethodDetails => m !== null);
+    .filter((m) => m !== null);
+  return methods as unknown as PaymentMethodDetails[];
 }
 
 export async function setDefaultPaymentMethod(orgId: string, methodId: string): Promise<boolean> {
   const dbMethod = await prisma.paymentMethod.findFirst({
-    where: { id: methodId, orgId },
+    where: { id: methodId, orgId, ...softDeleteFilter() },
   });
 
   if (!dbMethod) return false;
 
   // Unset default on all methods for this org
   await prisma.paymentMethod.updateMany({
-    where: { orgId },
+    where: { orgId, ...softDeleteFilter() },
     data: { isDefault: false },
   });
 
@@ -94,9 +92,9 @@ export async function setDefaultPaymentMethod(orgId: string, methodId: string): 
   return true;
 }
 
-export async function removePaymentMethod(orgId: string, methodId: string): Promise<boolean> {
+export async function removePaymentMethod(orgId: string, methodId: string, userId: string): Promise<boolean> {
   const dbMethod = await prisma.paymentMethod.findFirst({
-    where: { id: methodId, orgId },
+    where: { id: methodId, orgId, ...softDeleteFilter() },
   });
 
   if (!dbMethod) return false;
@@ -104,9 +102,10 @@ export async function removePaymentMethod(orgId: string, methodId: string): Prom
   // Delete from Stripe mock
   stripeDeletePaymentMethod(dbMethod.stripePaymentMethodId);
 
-  // Delete from DB
-  await prisma.paymentMethod.delete({
+  // Soft-delete from DB
+  await prisma.paymentMethod.update({
     where: { id: methodId },
+    data: { ...softDeleteData(userId), isDefault: false },
   });
 
   return true;

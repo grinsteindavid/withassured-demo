@@ -1,3 +1,5 @@
+import "server-only";
+
 import { prisma } from "@/lib/db";
 import { mockTemporal } from "@/lib/temporal/client";
 import { currentStep, fullStepList } from "@/lib/temporal/derive";
