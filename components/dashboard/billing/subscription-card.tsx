@@ -125,7 +125,7 @@ export function SubscriptionCard({
 
       {showPlanSelector && (
         <div className="mt-4">
-          <PlanSelector currentPlan={subscription.plan} onClose={() => setShowPlanSelector(false)} />
+          <PlanSelector currentPlan={subscription.status === "CANCELED" ? null : subscription.plan} onClose={() => setShowPlanSelector(false)} />
         </div>
       )}
     </Card>

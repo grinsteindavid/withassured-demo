@@ -64,10 +64,7 @@ export async function listPaymentMethods(orgId: string): Promise<PaymentMethodDe
     .map((dbMethod: { stripePaymentMethodId: string }) => {
       const stripeMethod = stripeMethods.find((sm) => sm.id === dbMethod.stripePaymentMethodId);
       if (!stripeMethod) return null;
-      return {
-        ...stripeMethod,
-        type: stripeMethod.type === "card" ? "CARD" : "ACH",
-      };
+      return stripeMethod;
     })
     .filter((m): m is PaymentMethodDetails => m !== null);
 }
