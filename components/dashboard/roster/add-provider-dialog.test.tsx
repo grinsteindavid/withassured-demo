@@ -12,14 +12,37 @@ import userEvent from "@testing-library/user-event";
 
 const { AddProviderDialog } = await import("./add-provider-dialog");
 
+const activeSubscription = {
+  id: "sub_1",
+  customer: "org_1",
+  plan: "STARTUP" as const,
+  status: "ACTIVE" as const,
+  currentPeriodStart: new Date().toISOString(),
+  currentPeriodEnd: new Date().toISOString(),
+  cancelAtPeriodEnd: false,
+  created_at: new Date().toISOString(),
+};
+
 describe("<AddProviderDialog />", () => {
   beforeEach(() => {
     push.mockClear();
     refresh.mockClear();
   });
 
-  it("opens dialog on trigger click", async () => {
+  it("shows subscribe CTA when no active subscription", () => {
     render(<AddProviderDialog />);
+
+    expect(screen.getByRole("link", { name: "Subscribe to add providers" })).toBeTruthy();
+  });
+
+  it("shows Add Provider trigger when subscription is active", () => {
+    render(<AddProviderDialog subscription={activeSubscription} />);
+
+    expect(screen.getByRole("button", { name: "Add Provider" })).toBeTruthy();
+  });
+
+  it("opens dialog on trigger click", async () => {
+    render(<AddProviderDialog subscription={activeSubscription} />);
 
     const triggers = screen.getAllByRole("button", { name: "Add Provider" });
     await userEvent.click(triggers[0]);
@@ -28,7 +51,7 @@ describe("<AddProviderDialog />", () => {
   });
 
   it("updates form fields", async () => {
-    render(<AddProviderDialog />);
+    render(<AddProviderDialog subscription={activeSubscription} />);
 
     const triggers = screen.getAllByRole("button", { name: "Add Provider" });
     await userEvent.click(triggers[0]);
@@ -60,7 +83,7 @@ describe("<AddProviderDialog />", () => {
     );
     global.fetch = fetchMock as unknown as typeof fetch;
 
-    render(<AddProviderDialog />);
+    render(<AddProviderDialog subscription={activeSubscription} />);
 
     const triggers = screen.getAllByRole("button", { name: "Add Provider" });
     await userEvent.click(triggers[0]);
@@ -105,7 +128,7 @@ describe("<AddProviderDialog />", () => {
     );
     global.fetch = fetchMock as unknown as typeof fetch;
 
-    render(<AddProviderDialog />);
+    render(<AddProviderDialog subscription={activeSubscription} />);
 
     const triggers = screen.getAllByRole("button", { name: "Add Provider" });
     await userEvent.click(triggers[0]);
@@ -140,7 +163,7 @@ describe("<AddProviderDialog />", () => {
     );
     global.fetch = fetchMock as unknown as typeof fetch;
 
-    render(<AddProviderDialog />);
+    render(<AddProviderDialog subscription={activeSubscription} />);
 
     const triggers = screen.getAllByRole("button", { name: "Add Provider" });
     await userEvent.click(triggers[0]);

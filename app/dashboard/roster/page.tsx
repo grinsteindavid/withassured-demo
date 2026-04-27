@@ -1,6 +1,7 @@
 import { getSessionUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { listProviders, getProviderDetail } from "@/lib/providers";
+import { getSubscription } from "@/lib/payments";
 import { ProviderFilters } from "@/components/dashboard/roster/provider-filters";
 import { ProviderRow } from "@/components/dashboard/roster/provider-row";
 import { ProviderDetail } from "@/components/dashboard/roster/provider-detail";
@@ -26,12 +27,13 @@ export default async function RosterPage({ searchParams }: RosterPageProps) {
   };
   const providers = await listProviders(user.orgId, filters);
   const detail = selectedProviderId ? await getProviderDetail(selectedProviderId, user.orgId) : null;
+  const subscription = await getSubscription(user.orgId);
 
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold">Provider Roster</h1>
-        <AddProviderDialog />
+        <AddProviderDialog subscription={subscription} />
       </div>
 
       <div className="grid grid-cols-12 gap-6">

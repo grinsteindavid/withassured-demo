@@ -13,8 +13,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import type { Subscription } from "@/lib/stripe-mock";
 
-export function AddProviderDialog() {
+export function AddProviderDialog({ subscription }: { subscription?: Subscription | null }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -63,6 +64,16 @@ export function AddProviderDialog() {
       setLoading(false);
     }
   };
+
+  const isActive = subscription?.status === "ACTIVE";
+
+  if (!isActive) {
+    return (
+      <a href="/dashboard/billing" className={cn(buttonVariants({ variant: "default" }))}>
+        Subscribe to add providers
+      </a>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
