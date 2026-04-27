@@ -15,10 +15,10 @@ export function PaymentMethods({
   const router = useRouter();
   const [loading, setLoading] = useState<string | null>(null);
 
-  const handleSetDefault = async (id: string) => {
-    setLoading(id);
+  const handleSetDefault = async (dbId: string) => {
+    setLoading(dbId);
     try {
-      const res = await fetch(`/api/payments/methods/${id}/default`, {
+      const res = await fetch(`/api/payments/methods/${dbId}/default`, {
         method: "POST",
       });
       if (res.ok) {
@@ -31,10 +31,10 @@ export function PaymentMethods({
     }
   };
 
-  const handleRemove = async (id: string) => {
-    setLoading(id);
+  const handleRemove = async (dbId: string) => {
+    setLoading(dbId);
     try {
-      const res = await fetch(`/api/payments/methods/${id}`, {
+      const res = await fetch(`/api/payments/methods/${dbId}`, {
         method: "DELETE",
       });
       if (res.ok) {
@@ -97,24 +97,21 @@ export function PaymentMethods({
             </div>
             <div className="flex items-center gap-2">
               {!method.isDefault && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleSetDefault(method.id)}
-                  disabled={loading === method.id}
+                <button
+                  onClick={() => handleSetDefault(method.dbId || method.id)}
+                  disabled={loading === (method.dbId || method.id) || method.isDefault}
+                  className="px-3 py-1 text-sm border rounded hover:bg-gray-50 disabled:opacity-50"
                 >
-                  {loading === method.id ? "Setting..." : "Set Default"}
-                </Button>
+                  {loading === (method.dbId || method.id) ? "Setting..." : "Set Default"}
+                </button>
               )}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleRemove(method.id)}
-                disabled={loading === method.id}
-                className="text-destructive hover:text-destructive"
+              <button
+                onClick={() => handleRemove(method.dbId || method.id)}
+                disabled={loading === (method.dbId || method.id)}
+                className="px-3 py-1 text-sm border rounded hover:bg-red-50 disabled:opacity-50"
               >
-                {loading === method.id ? "Removing..." : "Remove"}
-              </Button>
+                {loading === (method.dbId || method.id) ? "Removing..." : "Remove"}
+              </button>
             </div>
           </div>
         ))}

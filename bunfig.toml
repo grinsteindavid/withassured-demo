@@ -11,5 +11,5 @@
 # `--config=<name>` selector is broken in Bun 1.3.x (oven-sh/bun#25647), so
 # we keep a single [test] block and use an env var instead.
 [test]
-preload = ["./test-utils/setup.ts"]
+preload = ["./test-utils/env.ts", "./test-utils/setup.ts"]
 pathIgnorePatterns = ["tests/integration/**"]

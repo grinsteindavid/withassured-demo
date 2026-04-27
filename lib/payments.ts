@@ -61,10 +61,10 @@ export async function listPaymentMethods(orgId: string): Promise<PaymentMethodDe
     .map((dbMethod) => {
       const stripeMethod = stripeMethods.find((sm) => sm.id === dbMethod.stripePaymentMethodId);
       if (!stripeMethod) return null;
-      return { ...stripeMethod, dbId: dbMethod.id };
+      return { ...stripeMethod, dbId: dbMethod.id } as PaymentMethodDetails;
     })
-    .filter((m) => m !== null);
-  return methods as unknown as PaymentMethodDetails[];
+    .filter((m) => m !== null) as PaymentMethodDetails[];
+  return methods;
 }
 
 export async function setDefaultPaymentMethod(orgId: string, methodId: string): Promise<boolean> {

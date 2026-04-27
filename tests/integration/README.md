@@ -1,6 +1,9 @@
 # Integration tests
 
-Tests in this directory run against **real infrastructure** (database, network, etc.). They are excluded from the default `bun test` (see `pathIgnorePatterns` in `bunfig.toml`) and require an opt-in.
+Tests in this directory run against **real infrastructure** (database, network, etc.). They are excluded from the default `bun test` in two layers:
+
+1. **File extension** — these tests use the `.integration.ts` suffix (no `.test`), so Bun's default discovery glob (`*.test.{ts,tsx,js,...}` and `*.spec.*`) skips them entirely. This works regardless of which Bun version the CI uses and survives bunfig misconfigurations.
+2. **`pathIgnorePatterns` in `bunfig.toml`** — `tests/integration/**` is also listed there, as belt-and-suspenders for any future `*.test.ts` file added under this directory.
 
 ## Running
 
@@ -11,9 +14,10 @@ bun run test:integration
 Which expands to:
 
 ```sh
-BUN_INTEGRATION_TESTS=1 bun test --path-ignore-patterns='' tests/integration
+BUN_INTEGRATION_TESTS=1 bun test --path-ignore-patterns='' ./tests/integration/payments.integration.ts
 ```
 
+- The explicit `./`-prefixed file path is required because Bun's directory-mode discovery only matches `*.test.*` / `*.spec.*` files. Without the leading `./`, Bun interprets the argument as a name filter and refuses files lacking `.test`/`.spec` in the name. Prefixing with `./` (or any path separator) tells Bun to treat it as a literal file path and run it directly.
 - `BUN_INTEGRATION_TESTS=1` tells `test-utils/setup.ts` to skip `blockNetwork()`.
 - `--path-ignore-patterns=''` overrides the `tests/integration/**` exclusion declared in `bunfig.toml` (the bunfig list is fully replaced, not merged, when the flag is present).
 
@@ -25,7 +29,8 @@ Bun's docs describe a Jest-style conditional config via `[test.<name>]` plus `bu
 
 ## Conventions
 
-- File suffix: `*.integration.test.ts` (any `.test.ts` under this directory is also fine, but the suffix makes it obvious).
+- **File suffix: `*.integration.ts` (no `.test`).** This is what keeps Bun from auto-discovering the file in default `bun test` runs. New integration tests must follow this naming.
+- Add the file path explicitly to the `test:integration` script in `package.json` so it's runnable on demand.
 - Always assume the DB may have residual data from prior runs — use `beforeEach`/`afterAll` cleanup.
 - Do **not** import these files from unit tests.
 
