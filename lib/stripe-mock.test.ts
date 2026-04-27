@@ -18,9 +18,18 @@ import {
 // interacts poorly with cross-file mock.module registrations on older Bun
 // (observed on Vercel's build image). Direct injection sidesteps the issue
 // and is robust across Bun versions.
-const paymentMethodFindMany = mock(async () => [] as unknown[]);
-const subscriptionFindMany = mock(async () => [] as unknown[]);
-const invoiceFindMany = mock(async () => [] as unknown[]);
+const paymentMethodFindMany = mock(async () => {
+  console.log("[stripe-mock.test] paymentMethodFindMany CALLED");
+  return [] as unknown[];
+});
+const subscriptionFindMany = mock(async () => {
+  console.log("[stripe-mock.test] subscriptionFindMany CALLED");
+  return [] as unknown[];
+});
+const invoiceFindMany = mock(async () => {
+  console.log("[stripe-mock.test] invoiceFindMany CALLED");
+  return [] as unknown[];
+});
 
 const mockPrisma = {
   paymentMethod: { findMany: paymentMethodFindMany },
@@ -171,6 +180,7 @@ describe("Global State Pattern", () => {
 
 describe("syncStripeMockFromDB", () => {
   beforeEach(() => {
+    console.log("[stripe-mock.test] >>> beforeEach syncStripeMockFromDB block");
     resetMockState();
     paymentMethodFindMany.mockClear();
     subscriptionFindMany.mockClear();
@@ -178,6 +188,7 @@ describe("syncStripeMockFromDB", () => {
   });
 
   it("syncs payment methods from DB to Stripe mock", async () => {
+    console.log("[stripe-mock.test] TEST: syncs payment methods — START");
     paymentMethodFindMany.mockResolvedValueOnce([
       {
         id: "pm_db_1",
@@ -193,17 +204,22 @@ describe("syncStripeMockFromDB", () => {
       },
     ]);
 
+    console.log("[stripe-mock.test] calling syncStripeMockFromDB(mockPrisma)...");
     await syncStripeMockFromDB(mockPrisma);
+    console.log("[stripe-mock.test] syncStripeMockFromDB resolved");
 
     const methods = listPaymentMethods("org_1");
+    console.log("[stripe-mock.test] listPaymentMethods returned", methods.length, "items");
     expect(methods).toHaveLength(1);
     expect(methods[0].id).toBe("pm_mock_123");
     expect(methods[0].type).toBe("card");
     expect(methods[0].last4).toBe("4242");
     expect(methods[0].isDefault).toBe(true);
+    console.log("[stripe-mock.test] TEST: syncs payment methods — PASS");
   });
 
   it("syncs subscriptions from DB to Stripe mock", async () => {
+    console.log("[stripe-mock.test] TEST: syncs subscriptions — START");
     subscriptionFindMany.mockResolvedValueOnce([
       {
         id: "sub_db_1",
@@ -217,16 +233,21 @@ describe("syncStripeMockFromDB", () => {
       },
     ]);
 
+    console.log("[stripe-mock.test] calling syncStripeMockFromDB(mockPrisma)...");
     await syncStripeMockFromDB(mockPrisma);
+    console.log("[stripe-mock.test] syncStripeMockFromDB resolved");
 
     const subscription = getSubscription("org_1");
+    console.log("[stripe-mock.test] getSubscription returned", subscription ? subscription.id : "undefined");
     expect(subscription).toBeDefined();
     expect(subscription?.id).toBe("sub_db_1");
     expect(subscription?.plan).toBe("STARTUP");
     expect(subscription?.status).toBe("ACTIVE");
+    console.log("[stripe-mock.test] TEST: syncs subscriptions — PASS");
   });
 
   it("syncs invoices from DB to Stripe mock", async () => {
+    console.log("[stripe-mock.test] TEST: syncs invoices — START");
     invoiceFindMany.mockResolvedValueOnce([
       {
         id: "inv_db_1",
@@ -238,16 +259,21 @@ describe("syncStripeMockFromDB", () => {
       },
     ]);
 
+    console.log("[stripe-mock.test] calling syncStripeMockFromDB(mockPrisma)...");
     await syncStripeMockFromDB(mockPrisma);
+    console.log("[stripe-mock.test] syncStripeMockFromDB resolved");
 
     const invoices = listInvoices("org_1");
+    console.log("[stripe-mock.test] listInvoices returned", invoices.length, "items");
     const dbInvoice = invoices.find((inv) => inv.id === "inv_db_1");
     expect(dbInvoice).toBeDefined();
     expect(dbInvoice?.amount_due).toBe(5000);
     expect(dbInvoice?.status).toBe("open");
+    console.log("[stripe-mock.test] TEST: syncs invoices — PASS");
   });
 
   it("transforms DB types to Stripe mock types", async () => {
+    console.log("[stripe-mock.test] TEST: transforms DB types — START");
     paymentMethodFindMany.mockResolvedValueOnce([
       {
         id: "pm_db_1",
@@ -273,17 +299,23 @@ describe("syncStripeMockFromDB", () => {
       },
     ]);
 
+    console.log("[stripe-mock.test] calling syncStripeMockFromDB(mockPrisma)...");
     await syncStripeMockFromDB(mockPrisma);
+    console.log("[stripe-mock.test] syncStripeMockFromDB resolved");
 
     const methods = listPaymentMethods("org_1");
+    console.log("[stripe-mock.test] listPaymentMethods returned", methods.length, "items");
     expect(methods[0].type).toBe("card"); // CARD → card
 
     const invoices = listInvoices("org_1");
+    console.log("[stripe-mock.test] listInvoices returned", invoices.length, "items");
     const dbInvoice = invoices.find((inv) => inv.id === "inv_db_1");
     expect(dbInvoice?.status).toBe("open"); // OPEN → open
+    console.log("[stripe-mock.test] TEST: transforms DB types — PASS");
   });
 
   it("handles empty DB gracefully", async () => {
+    console.log("[stripe-mock.test] TEST: handles empty DB — START");
     paymentMethodFindMany.mockResolvedValueOnce([]);
     subscriptionFindMany.mockResolvedValueOnce([]);
     invoiceFindMany.mockResolvedValueOnce([]);
@@ -293,16 +325,19 @@ describe("syncStripeMockFromDB", () => {
     expect(listPaymentMethods("org_1")).toHaveLength(0);
     expect(getSubscription("org_1")).toBeUndefined();
     expect(listInvoices("org_1")).toHaveLength(0);
+    console.log("[stripe-mock.test] TEST: handles empty DB — PASS");
   });
 });
 
 describe("Post-Sync Functionality", () => {
   beforeEach(() => {
+    console.log("[stripe-mock.test] >>> beforeEach Post-Sync block");
     resetMockState();
     paymentMethodFindMany.mockClear();
   });
 
   it("listPaymentMethods returns synced data", async () => {
+    console.log("[stripe-mock.test] TEST: listPaymentMethods returns synced data — START");
     paymentMethodFindMany.mockResolvedValueOnce([
       {
         id: "pm_db_1",
@@ -318,10 +353,14 @@ describe("Post-Sync Functionality", () => {
       },
     ]);
 
+    console.log("[stripe-mock.test] calling syncStripeMockFromDB(mockPrisma)...");
     await syncStripeMockFromDB(mockPrisma);
+    console.log("[stripe-mock.test] syncStripeMockFromDB resolved");
 
     const methods = listPaymentMethods("org_1");
+    console.log("[stripe-mock.test] listPaymentMethods returned", methods.length, "items");
     expect(methods).toHaveLength(1);
     expect(methods[0].id).toBe("pm_mock_123");
+    console.log("[stripe-mock.test] TEST: listPaymentMethods returns synced data — PASS");
   });
 });

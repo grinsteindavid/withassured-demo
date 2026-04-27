@@ -77,6 +77,19 @@ if (process.env.NODE_ENV !== "production") {
   globalForStripe.stripeState = state;
 }
 
+console.log(
+  "[stripe-mock] module init: globalThis.stripeState reused?",
+  !!globalForStripe.stripeState,
+  "NODE_ENV:",
+  process.env.NODE_ENV,
+  "state.pm.size:",
+  state.paymentMethods.size,
+  "state.sub.size:",
+  state.subscriptions.size,
+  "state.inv.size:",
+  state.invoices.size,
+);
+
 export function createInvoice(params: {
   customerId: string;
   lines: StripeInvoiceLine[];
@@ -142,7 +155,17 @@ export function getSubscriptionItems(customerId: string): Record<string, number>
 
 export function listInvoices(customerId?: string): StripeInvoice[] {
   const all = Array.from(state.invoices.values());
-  return customerId ? all.filter((inv) => inv.customer === customerId) : all;
+  const result = customerId ? all.filter((inv) => inv.customer === customerId) : all;
+  console.log(
+    "[stripe-mock] listInvoices(",
+    customerId,
+    ") =>",
+    result.length,
+    "items (total Map size:",
+    state.invoices.size,
+    ")",
+  );
+  return result;
 }
 
 export function getInvoice(invoiceId: string): StripeInvoice | undefined {
@@ -150,6 +173,16 @@ export function getInvoice(invoiceId: string): StripeInvoice | undefined {
 }
 
 export function resetMockState(): void {
+  console.log(
+    "[stripe-mock] resetMockState called. BEFORE clear — pm:",
+    state.paymentMethods.size,
+    "sub:",
+    state.subscriptions.size,
+    "inv:",
+    state.invoices.size,
+    "meter:",
+    state.meterEvents.size,
+  );
   state.invoices.clear();
   state.meterEvents.clear();
   state.paymentMethods.clear();
@@ -158,6 +191,7 @@ export function resetMockState(): void {
   state.eventCounter = 0;
   state.paymentMethodCounter = 0;
   state.subscriptionCounter = 0;
+  console.log("[stripe-mock] resetMockState done. AFTER clear — all Maps empty.");
 }
 
 export function createPaymentMethod(params: {
@@ -199,7 +233,17 @@ export function createPaymentMethod(params: {
 
 export function listPaymentMethods(customerId: string): PaymentMethodDetails[] {
   const all = Array.from(state.paymentMethods.values());
-  return all.filter((pm) => pm.customer === customerId);
+  const result = all.filter((pm) => pm.customer === customerId);
+  console.log(
+    "[stripe-mock] listPaymentMethods(",
+    customerId,
+    ") =>",
+    result.length,
+    "items (total Map size:",
+    state.paymentMethods.size,
+    ")",
+  );
+  return result;
 }
 
 export function setDefaultPaymentMethod(paymentMethodId: string): boolean {
@@ -256,7 +300,17 @@ export function createSubscription(params: {
 
 export function getSubscription(customerId: string): Subscription | undefined {
   const all = Array.from(state.subscriptions.values());
-  return all.find((sub) => sub.customer === customerId);
+  const result = all.find((sub) => sub.customer === customerId);
+  console.log(
+    "[stripe-mock] getSubscription(",
+    customerId,
+    ") =>",
+    result ? "found" : "undefined",
+    "(total Map size:",
+    state.subscriptions.size,
+    ")",
+  );
+  return result;
 }
 
 export function cancelSubscription(customerId: string): Subscription | null {
@@ -342,6 +396,7 @@ export type PrismaForSync = {
 // between `mock.module("@/lib/db")` and `await import("@/lib/db")` on
 // older Bun versions (observed failing on Vercel's build image).
 export async function syncStripeMockFromDB(db?: PrismaForSync): Promise<void> {
+  console.log("[stripe-mock] syncStripeMockFromDB START — db provided?", !!db);
   const client: PrismaForSync =
     db ?? ((await import("@/lib/db")).prisma as unknown as PrismaForSync);
 
@@ -349,7 +404,18 @@ export async function syncStripeMockFromDB(db?: PrismaForSync): Promise<void> {
   const dbPaymentMethods = await client.paymentMethod.findMany({
     where: { deletedAt: null },
   });
+  console.log(
+    "[stripe-mock] syncStripeMockFromDB paymentMethod.findMany returned",
+    dbPaymentMethods.length,
+    "rows",
+  );
   for (const pm of dbPaymentMethods) {
+    console.log(
+      "[stripe-mock] syncStripeMockFromDB setting paymentMethod",
+      pm.stripePaymentMethodId,
+      "for org",
+      pm.orgId,
+    );
     state.paymentMethods.set(pm.stripePaymentMethodId, {
       id: pm.stripePaymentMethodId,
       type: pm.type.toLowerCase() as "card" | "ach",
@@ -367,7 +433,18 @@ export async function syncStripeMockFromDB(db?: PrismaForSync): Promise<void> {
 
   // Sync Subscriptions
   const dbSubscriptions = await client.subscription.findMany();
+  console.log(
+    "[stripe-mock] syncStripeMockFromDB subscription.findMany returned",
+    dbSubscriptions.length,
+    "rows",
+  );
   for (const sub of dbSubscriptions) {
+    console.log(
+      "[stripe-mock] syncStripeMockFromDB setting subscription",
+      sub.id,
+      "for org",
+      sub.orgId,
+    );
     state.subscriptions.set(sub.id, {
       id: sub.id,
       customer: sub.orgId,
@@ -383,7 +460,18 @@ export async function syncStripeMockFromDB(db?: PrismaForSync): Promise<void> {
 
   // Sync Invoices
   const dbInvoices = await client.invoice.findMany();
+  console.log(
+    "[stripe-mock] syncStripeMockFromDB invoice.findMany returned",
+    dbInvoices.length,
+    "rows",
+  );
   for (const inv of dbInvoices) {
+    console.log(
+      "[stripe-mock] syncStripeMockFromDB setting invoice",
+      inv.id,
+      "for org",
+      inv.orgId,
+    );
     state.invoices.set(inv.id, {
       id: inv.id,
       customer: inv.orgId,
@@ -395,4 +483,13 @@ export async function syncStripeMockFromDB(db?: PrismaForSync): Promise<void> {
     });
   }
   state.invoiceCounter = dbInvoices.length;
+
+  console.log(
+    "[stripe-mock] syncStripeMockFromDB DONE — pm:",
+    state.paymentMethods.size,
+    "sub:",
+    state.subscriptions.size,
+    "inv:",
+    state.invoices.size,
+  );
 }
