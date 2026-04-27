@@ -45,12 +45,12 @@ export function SubscriptionCard({
           <Button onClick={() => setShowPlanSelector(true)} disabled={loading}>
             {loading ? "Processing..." : "Subscribe"}
           </Button>
-          {showPlanSelector && (
-            <div className="mt-4">
-              <PlanSelector currentPlan={null} onClose={() => setShowPlanSelector(false)} />
-            </div>
-          )}
         </div>
+        {showPlanSelector && (
+          <div className="mt-6">
+            <PlanSelector currentPlan={null} onClose={() => setShowPlanSelector(false)} />
+          </div>
+        )}
       </Card>
     );
   }
