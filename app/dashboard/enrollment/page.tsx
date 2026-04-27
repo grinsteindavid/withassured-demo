@@ -1,9 +1,11 @@
 import { listPayerEnrollments, listProviders } from "@/lib/enrollment";
 import { getSessionUser } from "@/lib/auth";
+import { getSubscription } from "@/lib/payments";
 import { redirect } from "next/navigation";
 import { DataTable } from "@/components/dashboard/data-table";
 import { EnrollmentRow } from "@/components/dashboard/enrollment/enrollment-row";
 import { WorkflowHeartbeat } from "@/components/dashboard/workflow-heartbeat";
+import { AddPayerEnrollmentDialog } from "@/components/dashboard/enrollment/add-payer-enrollment-dialog";
 
 export default async function EnrollmentPage() {
   const user = await getSessionUser();
@@ -12,9 +14,10 @@ export default async function EnrollmentPage() {
     redirect("/login");
   }
 
-  const [enrollments, providers] = await Promise.all([
+  const [enrollments, providers, subscription] = await Promise.all([
     listPayerEnrollments(user.orgId),
     listProviders(user.orgId),
+    getSubscription(user.orgId),
   ]);
   const providerMap = new Map(providers.map((p) => [p.id, p.name] as [string, string]));
 
@@ -27,7 +30,10 @@ export default async function EnrollmentPage() {
     <>
       <WorkflowHeartbeat />
       <div>
-        <h1 className="mb-6 text-2xl font-bold">Payer Enrollment</h1>
+        <div className="mb-6 flex items-center justify-between">
+          <h1 className="text-2xl font-bold">Payer Enrollment</h1>
+          <AddPayerEnrollmentDialog subscription={subscription} providers={providers} />
+        </div>
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-4">
         <div className="rounded border p-4">

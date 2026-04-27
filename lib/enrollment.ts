@@ -1,6 +1,9 @@
 import "server-only";
 
 import { prisma } from "@/lib/db";
+import { controls } from "@/lib/temporal/client";
+import type { createPayerEnrollmentSchema } from "@/lib/validators";
+import type { z } from "zod";
 
 export async function listPayerEnrollments(orgId: string) {
   return prisma.payerEnrollment.findMany({
@@ -45,4 +48,36 @@ export async function getDashboardMetrics(orgId: string) {
   ]);
 
   return { totalProviders, activeCredentials, pendingEnrollments, complianceAlerts, expiredLicenses };
+}
+
+export async function createPayerEnrollment(
+  data: z.infer<typeof createPayerEnrollmentSchema>,
+  orgId: string,
+) {
+  const provider = await prisma.provider.findFirst({
+    where: { id: data.providerId, orgId },
+  });
+  if (!provider) {
+    throw new Error("Provider not found");
+  }
+
+  const enrollment = await prisma.payerEnrollment.create({
+    data: {
+      providerId: data.providerId,
+      payer: data.payer,
+      state: data.state,
+      status: "PENDING",
+      submittedAt: data.submittedAt ? new Date(data.submittedAt) : null,
+    },
+  });
+
+  const workflowId = `enr_${enrollment.id}`;
+  await prisma.payerEnrollment.update({
+    where: { id: enrollment.id },
+    data: { workflowId },
+  });
+
+  controls.create(workflowId, { status: "RUNNING", completedCount: 0 });
+
+  return prisma.payerEnrollment.findUnique({ where: { id: enrollment.id } });
 }

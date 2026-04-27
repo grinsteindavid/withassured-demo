@@ -51,3 +51,10 @@ export const addPaymentMethodSchema = z.object({
 export const createSubscriptionSchema = z.object({
   plan: z.enum(["STARTUP", "GROWTH", "ENTERPRISE"]),
 });
+
+export const createPayerEnrollmentSchema = z.object({
+  providerId: z.string().min(1),
+  payer: z.string().min(1),
+  state: z.string().min(1),
+  submittedAt: z.string().datetime().optional(),
+});
