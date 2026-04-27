@@ -12,17 +12,21 @@ import {
   getSubscription,
 } from "./stripe-mock";
 
+// Mocks injected directly into syncStripeMockFromDB via its optional `db`
+// parameter. We deliberately do NOT call `mock.module("@/lib/db", ...)` here:
+// the dynamic `await import("@/lib/db")` inside syncStripeMockFromDB
+// interacts poorly with cross-file mock.module registrations on older Bun
+// (observed on Vercel's build image). Direct injection sidesteps the issue
+// and is robust across Bun versions.
 const paymentMethodFindMany = mock(async () => [] as unknown[]);
 const subscriptionFindMany = mock(async () => [] as unknown[]);
 const invoiceFindMany = mock(async () => [] as unknown[]);
 
-mock.module("@/lib/db", () => ({
-  prisma: {
-    paymentMethod: { findMany: paymentMethodFindMany },
-    subscription: { findMany: subscriptionFindMany },
-    invoice: { findMany: invoiceFindMany },
-  },
-}));
+const mockPrisma = {
+  paymentMethod: { findMany: paymentMethodFindMany },
+  subscription: { findMany: subscriptionFindMany },
+  invoice: { findMany: invoiceFindMany },
+} as unknown as Parameters<typeof syncStripeMockFromDB>[0];
 
 describe("stripe-mock", () => {
   beforeEach(() => {
@@ -189,7 +193,7 @@ describe("syncStripeMockFromDB", () => {
       },
     ]);
 
-    await syncStripeMockFromDB();
+    await syncStripeMockFromDB(mockPrisma);
 
     const methods = listPaymentMethods("org_1");
     expect(methods).toHaveLength(1);
@@ -213,7 +217,7 @@ describe("syncStripeMockFromDB", () => {
       },
     ]);
 
-    await syncStripeMockFromDB();
+    await syncStripeMockFromDB(mockPrisma);
 
     const subscription = getSubscription("org_1");
     expect(subscription).toBeDefined();
@@ -234,7 +238,7 @@ describe("syncStripeMockFromDB", () => {
       },
     ]);
 
-    await syncStripeMockFromDB();
+    await syncStripeMockFromDB(mockPrisma);
 
     const invoices = listInvoices("org_1");
     const dbInvoice = invoices.find((inv) => inv.id === "inv_db_1");
@@ -269,7 +273,7 @@ describe("syncStripeMockFromDB", () => {
       },
     ]);
 
-    await syncStripeMockFromDB();
+    await syncStripeMockFromDB(mockPrisma);
 
     const methods = listPaymentMethods("org_1");
     expect(methods[0].type).toBe("card"); // CARD → card
@@ -284,7 +288,7 @@ describe("syncStripeMockFromDB", () => {
     subscriptionFindMany.mockResolvedValueOnce([]);
     invoiceFindMany.mockResolvedValueOnce([]);
 
-    await syncStripeMockFromDB();
+    await syncStripeMockFromDB(mockPrisma);
 
     expect(listPaymentMethods("org_1")).toHaveLength(0);
     expect(getSubscription("org_1")).toBeUndefined();
@@ -314,7 +318,7 @@ describe("Post-Sync Functionality", () => {
       },
     ]);
 
-    await syncStripeMockFromDB();
+    await syncStripeMockFromDB(mockPrisma);
 
     const methods = listPaymentMethods("org_1");
     expect(methods).toHaveLength(1);

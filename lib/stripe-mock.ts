@@ -285,12 +285,68 @@ export function updateSubscription(params: {
   return subscription;
 }
 
-// DB sync function - reads from Prisma and populates Stripe mock
-export async function syncStripeMockFromDB(): Promise<void> {
-  const { prisma } = await import("@/lib/db");
+// Narrow structural type covering only what syncStripeMockFromDB reads from
+// prisma. Lets callers (including tests) inject a minimal fake without having
+// to satisfy the full @prisma/client surface. Using this also gets rid of the
+// `(prisma as any)` casts that were previously needed because the generated
+// Prisma types are not in scope here.
+type DbPaymentMethodRow = {
+  id: string;
+  stripePaymentMethodId: string;
+  orgId: string;
+  type: string;
+  last4: string;
+  expiryMonth: number;
+  expiryYear: number;
+  brand: string | null;
+  isDefault: boolean;
+  createdAt: Date;
+};
+
+type DbSubscriptionRow = {
+  id: string;
+  orgId: string;
+  plan: "STARTUP" | "GROWTH" | "ENTERPRISE";
+  status: "ACTIVE" | "PAST_DUE" | "CANCELED" | "TRIALING";
+  currentPeriodStart: Date;
+  currentPeriodEnd: Date;
+  cancelAtPeriodEnd: boolean;
+  createdAt: Date;
+};
+
+type DbInvoiceRow = {
+  id: string;
+  orgId: string;
+  totalCents: number;
+  status: string;
+  lineItems: StripeInvoiceLine[];
+  createdAt: Date;
+};
+
+export type PrismaForSync = {
+  paymentMethod: {
+    findMany: (args: { where: { deletedAt: null } }) => Promise<DbPaymentMethodRow[]>;
+  };
+  subscription: {
+    findMany: () => Promise<DbSubscriptionRow[]>;
+  };
+  invoice: {
+    findMany: () => Promise<DbInvoiceRow[]>;
+  };
+};
+
+// DB sync function - reads from Prisma and populates Stripe mock.
+// `db` is optional so production callers (app/layout.tsx) can keep calling
+// `syncStripeMockFromDB()` with no args and rely on the dynamic import.
+// Tests inject a mock `db` directly, avoiding the fragile interaction
+// between `mock.module("@/lib/db")` and `await import("@/lib/db")` on
+// older Bun versions (observed failing on Vercel's build image).
+export async function syncStripeMockFromDB(db?: PrismaForSync): Promise<void> {
+  const client: PrismaForSync =
+    db ?? ((await import("@/lib/db")).prisma as unknown as PrismaForSync);
 
   // Sync PaymentMethods (exclude soft-deleted)
-  const dbPaymentMethods = await (prisma as any).paymentMethod.findMany({
+  const dbPaymentMethods = await client.paymentMethod.findMany({
     where: { deletedAt: null },
   });
   for (const pm of dbPaymentMethods) {
@@ -300,7 +356,7 @@ export async function syncStripeMockFromDB(): Promise<void> {
       last4: pm.last4,
       expiryMonth: pm.expiryMonth,
       expiryYear: pm.expiryYear,
-      brand: pm.brand,
+      brand: pm.brand ?? undefined,
       customer: pm.orgId,
       isDefault: pm.isDefault,
       created_at: pm.createdAt.toISOString(),
@@ -310,7 +366,7 @@ export async function syncStripeMockFromDB(): Promise<void> {
   state.paymentMethodCounter = dbPaymentMethods.length;
 
   // Sync Subscriptions
-  const dbSubscriptions = await (prisma as any).subscription.findMany();
+  const dbSubscriptions = await client.subscription.findMany();
   for (const sub of dbSubscriptions) {
     state.subscriptions.set(sub.id, {
       id: sub.id,
@@ -326,7 +382,7 @@ export async function syncStripeMockFromDB(): Promise<void> {
   state.subscriptionCounter = dbSubscriptions.length;
 
   // Sync Invoices
-  const dbInvoices = await (prisma as any).invoice.findMany();
+  const dbInvoices = await client.invoice.findMany();
   for (const inv of dbInvoices) {
     state.invoices.set(inv.id, {
       id: inv.id,
@@ -334,7 +390,7 @@ export async function syncStripeMockFromDB(): Promise<void> {
       status: inv.status.toLowerCase() as "draft" | "open" | "paid" | "void",
       amount_due: inv.totalCents,
       amount_paid: inv.status === "PAID" ? inv.totalCents : 0,
-      lines: inv.lineItems as StripeInvoiceLine[],
+      lines: inv.lineItems,
       created_at: inv.createdAt.toISOString(),
     });
   }
