@@ -25,10 +25,15 @@ export function InvoiceDetail({
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>("");
+  const [payError, setPayError] = useState<string | null>(null);
+  const [paySuccess, setPaySuccess] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   const handlePay = async () => {
     if (!selectedPaymentMethod) return;
     setLoading(true);
+    setPayError(null);
+    setPaySuccess(false);
 
     try {
       const res = await fetch(`/api/billing/invoices/${invoice.id}/pay-with-method`, {
@@ -38,23 +43,41 @@ export function InvoiceDetail({
       });
 
       if (res.ok) {
+        setPaySuccess(true);
         router.refresh();
       } else {
-        console.error("Failed to pay invoice");
+        const data = await res.json().catch(() => ({}));
+        setPayError(data.error || "Failed to pay invoice");
       }
-    } catch (error) {
-      console.error("Error paying invoice:", error);
+    } catch {
+      setPayError("Network error. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDownload = () => {
-    // Mock PDF download
-    const link = document.createElement("a");
-    link.href = "#";
-    link.download = `invoice-${invoice.id}.pdf`;
-    link.click();
+  const handleDownload = async () => {
+    setDownloading(true);
+    try {
+      const res = await fetch(`/api/billing/invoices/${invoice.id}/pdf`);
+      if (!res.ok) {
+        setPayError("Failed to download invoice PDF");
+        return;
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `invoice-${invoice.id}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      setPayError("Failed to download invoice PDF");
+    } finally {
+      setDownloading(false);
+    }
   };
 
   const formatCents = (cents: number) => {
@@ -72,8 +95,8 @@ export function InvoiceDetail({
         </div>
         <div className="flex items-center gap-2">
           <StatusBadge status={invoice.status} />
-          <Button variant="outline" size="sm" onClick={handleDownload}>
-            Download PDF
+          <Button variant="outline" size="sm" onClick={handleDownload} disabled={downloading}>
+            {downloading ? "Downloading..." : "Download PDF"}
           </Button>
         </div>
       </div>
@@ -108,6 +131,7 @@ export function InvoiceDetail({
             <select
               value={selectedPaymentMethod}
               onChange={(e) => setSelectedPaymentMethod(e.target.value)}
+              disabled={loading}
               className="flex-1 p-2 border rounded"
             >
               <option value="">Select payment method</option>
@@ -121,6 +145,12 @@ export function InvoiceDetail({
               {loading ? "Processing..." : "Pay Now"}
             </Button>
           </div>
+          {payError && (
+            <p className="mt-2 text-sm text-red-600">{payError}</p>
+          )}
+          {paySuccess && (
+            <p className="mt-2 text-sm text-green-600">Payment successful</p>
+          )}
         </div>
       )}
 

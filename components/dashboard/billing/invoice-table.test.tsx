@@ -18,15 +18,17 @@ describe("<InvoiceTable />", () => {
     ];
 
     render(<InvoiceTable invoices={invoices} />);
-    
-    expect(screen.getByText("inv_1")).toBeTruthy();
+
+    const link = screen.getByRole("link", { name: "inv_1" }) as HTMLAnchorElement;
+    expect(link).toBeTruthy();
+    expect(link.href).toContain("/dashboard/billing/invoices/inv_1");
     expect(screen.getByText("$50")).toBeTruthy();
     expect(screen.getByText("$55")).toBeTruthy();
   });
 
   it("renders empty table when no invoices", () => {
     render(<InvoiceTable invoices={[]} />);
-    
+
     expect(screen.getByText("ID")).toBeTruthy();
   });
 
@@ -43,7 +45,7 @@ describe("<InvoiceTable />", () => {
     ];
 
     render(<InvoiceTable invoices={invoices} />);
-    
+
     expect(screen.getByText("OPEN")).toBeTruthy();
   });
 
@@ -68,8 +70,10 @@ describe("<InvoiceTable />", () => {
     ];
 
     render(<InvoiceTable invoices={invoices} />);
-    
-    expect(screen.getByText("inv_1")).toBeTruthy();
-    expect(screen.getByText("inv_2")).toBeTruthy();
+
+    const links = screen.getAllByRole("link");
+    expect(links.length).toBe(2);
+    expect(links[0]).toHaveTextContent("inv_1");
+    expect(links[1]).toHaveTextContent("inv_2");
   });
 });

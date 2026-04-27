@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { DataTable } from "../data-table";
 import { StatusBadge } from "../status-badge";
 import { formatDate } from "@/lib/format";
@@ -18,7 +19,14 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
     <DataTable columns={["ID", "Period", "Subtotal", "Total", "Status"]}>
       {invoices.map((invoice) => (
         <tr key={invoice.id} className="border-b">
-          <td className="px-4 py-2">{invoice.id}</td>
+          <td className="px-4 py-2">
+            <Link
+              href={`/dashboard/billing/invoices/${invoice.id}`}
+              className="text-blue-600 hover:underline"
+            >
+              {invoice.id}
+            </Link>
+          </td>
           <td className="px-4 py-2">
             {formatDate(invoice.periodStart)} - {formatDate(invoice.periodEnd)}
           </td>

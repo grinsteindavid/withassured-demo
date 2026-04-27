@@ -112,6 +112,28 @@ describe("<InvoiceDetail />", () => {
       })
     );
     expect(refresh).toHaveBeenCalled();
+    expect(screen.getByText("Payment successful")).toBeTruthy();
+  });
+
+  it("shows pay error when API fails", async () => {
+    const fetchMock = mock(() =>
+      Promise.resolve({ ok: false, json: () => Promise.resolve({ error: "Card declined" }) } as Response)
+    );
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const paymentMethods = [
+      { id: "pm_1", last4: "4242", type: "card" },
+    ];
+
+    render(<InvoiceDetail invoice={invoice} paymentMethods={paymentMethods} />);
+
+    const methodSelect = screen.getByText(/Card •••• 4242/).closest("select")!;
+    await userEvent.selectOptions(methodSelect, "pm_1");
+
+    const payButton = screen.getByText("Pay Now");
+    await userEvent.click(payButton);
+
+    expect(screen.getByText("Card declined")).toBeTruthy();
   });
 
   it("disables pay button when no method selected", () => {
@@ -125,7 +147,7 @@ describe("<InvoiceDetail />", () => {
     expect(payButton.disabled).toBe(true);
   });
 
-  it("disables pay button while loading", async () => {
+  it("disables pay button and select while loading", async () => {
     let resolveFetch: (value: Response) => void;
     const fetchPromise = new Promise<Response>((resolve) => {
       resolveFetch = resolve;
@@ -139,7 +161,7 @@ describe("<InvoiceDetail />", () => {
 
     render(<InvoiceDetail invoice={invoice} paymentMethods={paymentMethods} />);
 
-    const methodSelect = screen.getByText(/Card •••• 4242/).closest("select")!;
+    const methodSelect = screen.getByText(/Card •••• 4242/).closest("select")! as HTMLSelectElement;
     await userEvent.selectOptions(methodSelect, "pm_1");
 
     const payButton = screen.getByText("Pay Now") || screen.getByText("Processing...");
@@ -147,8 +169,32 @@ describe("<InvoiceDetail />", () => {
 
     const processingButton = screen.getByText("Processing...") as HTMLButtonElement;
     expect(processingButton.disabled).toBe(true);
+    expect(methodSelect.disabled).toBe(true);
 
     resolveFetch!({ ok: true } as Response);
     await fetchPromise;
+  });
+
+  it("fetches and downloads PDF on button click", async () => {
+    const blob = new Blob(["fake-pdf"], { type: "application/pdf" });
+    const fetchMock = mock(() =>
+      Promise.resolve({
+        ok: true,
+        blob: () => Promise.resolve(blob),
+      } as Response)
+    );
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const createObjectURLMock = mock(() => "blob:fake-url");
+    global.URL.createObjectURL = createObjectURLMock;
+    global.URL.revokeObjectURL = mock(() => {});
+
+    render(<InvoiceDetail invoice={invoice} paymentMethods={[]} />);
+
+    const downloadButton = screen.getByText("Download PDF");
+    await userEvent.click(downloadButton);
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/billing/invoices/inv_1/pdf");
+    expect(createObjectURLMock).toHaveBeenCalled();
   });
 });
