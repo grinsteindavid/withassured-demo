@@ -16,7 +16,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             Licensing
           </a>
           <a href="/dashboard/enrollment" className="block p-2 hover:bg-gray-100 rounded">
-            Enrollment
+            Payer Enrollment
           </a>
           <a href="/dashboard/compliance" className="block p-2 hover:bg-gray-100 rounded">
             Compliance

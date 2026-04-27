@@ -22,15 +22,21 @@ const invoiceFindMany = mock(async () => [
 const invoiceFindUnique = mock(async (_args: { where: { id: string } }) => null as unknown);
 const invoiceUpdate = mock(async (_args: { where: { id: string }; data: { status: string } }) => ({}));
 const invoiceUpdateMany = mock(async (_args: { where: { id: string }; data: { status: string } }) => ({ count: 1 }));
+const subscriptionFindUnique = mock(async (_args: { where: { orgId: string } }) => ({
+  orgId: "org_test",
+  plan: "STARTUP",
+  status: "ACTIVE",
+}) as unknown);
 
 mock.module("@/lib/db", () => ({
   prisma: {
     usageEvent: { findMany: usageFindMany, create: usageEventCreate },
     invoice: { findMany: invoiceFindMany, findUnique: invoiceFindUnique, update: invoiceUpdate, updateMany: invoiceUpdateMany },
+    subscription: { findUnique: subscriptionFindUnique },
   },
 }));
 
-const { rollupUsage, periodRange, getCurrentUsage, listAllInvoices, recordUsageEvent, processInvoicePayment } = await import("./billing");
+const { rollupUsage, periodRange, getCurrentUsage, listAllInvoices, recordUsageEvent, processInvoicePayment, getInvoiceById, isValidUsageType } = await import("./billing");
 
 beforeEach(() => {
   resetMockState();
@@ -56,6 +62,19 @@ describe("rollupUsage", () => {
     expect(result.subtotalCents).toBe(0);
     expect(result.totalCents).toBe(150_000);
   });
+
+  it("uses the last unitCents when same type has different values", () => {
+    const result = rollupUsage({
+      platformFeeCents: 150_000,
+      events: [
+        { type: "CREDENTIALING", unitCents: 19_900 },
+        { type: "CREDENTIALING", unitCents: 29_900 },
+      ],
+    });
+    const line = result.lines.find((l) => l.type === "CREDENTIALING");
+    expect(line!.unitCents).toBe(29_900);
+    expect(line!.subtotalCents).toBe(49_800);
+  });
 });
 
 describe("periodRange", () => {
@@ -73,53 +92,50 @@ describe("periodRange", () => {
     expect(periodEnd.getMonth()).toBe(2);
     expect(periodEnd.getDate()).toBe(31);
   });
+
+  it("returns 29 days for February in a leap year", () => {
+    const { periodStart, periodEnd } = periodRange("current", new Date(2024, 1, 15));
+    expect(periodStart.getMonth()).toBe(1);
+    expect(periodStart.getDate()).toBe(1);
+    expect(periodEnd.getMonth()).toBe(1);
+    expect(periodEnd.getDate()).toBe(29);
+  });
 });
 
 describe("getCurrentUsage", () => {
-  it("queries uninvoiced events and returns rollup with period bounds", async () => {
+  it("queries uninvoiced events and returns rollup with plan-based fee", async () => {
     usageFindMany.mockClear();
+    subscriptionFindUnique.mockClear();
     const usage = await getCurrentUsage("current", "org_test");
 
     expect(usageFindMany).toHaveBeenCalledTimes(1);
+    expect(subscriptionFindUnique).toHaveBeenCalledTimes(1);
     const call = usageFindMany.mock.calls[0][0] as {
       where: { occurredAt: { gte: Date; lte: Date }; invoiceId: null; orgId: string };
     };
     expect(call.where.invoiceId).toBeNull();
     expect(call.where.orgId).toBe("org_test");
     expect(usage.subtotalCents).toBe(49_700);
-    expect(usage.totalCents).toBe(199_700);
-    expect(usage.platformFeeCents).toBe(150_000);
+    expect(usage.platformFeeCents).toBe(29_900);
+    expect(usage.totalCents).toBe(79_600);
+  });
+
+  it("returns zero platform fee when no subscription exists", async () => {
+    subscriptionFindUnique.mockResolvedValueOnce(null);
+    usageFindMany.mockClear();
+    const usage = await getCurrentUsage("current", "org_test");
+
+    expect(usage.platformFeeCents).toBe(0);
+    expect(usage.totalCents).toBe(49_700);
   });
 });
 
 describe("listAllInvoices", () => {
-  it("merges DB and stripe-mock invoices, sorted by periodStart desc", async () => {
-    createInvoice({
-      customerId: "org_test",
-      lines: [{ description: "demo", amount: 5000, quantity: 1 }],
-      autoAdvance: true,
-    });
-
-    const all = await listAllInvoices("org_test");
-    expect(all).toHaveLength(2);
-    const stripeRow = all.find((i) => i.id.startsWith("inv_mock_"));
-    const dbRow = all.find((i) => i.id === "db_inv_1");
-    expect(stripeRow).toBeDefined();
-    expect(dbRow).toBeDefined();
-    // Stripe invoice was just created (today), DB row is from 2026-03 → stripe sorts first.
-    expect(all[0].id).toBe(stripeRow!.id);
-  });
-
-  it("uppercases stripe-mock status to match the DB union", async () => {
-    createInvoice({
-      customerId: "org_test",
-      lines: [{ description: "demo", amount: 5000, quantity: 1 }],
-      autoAdvance: true,
-    });
-
-    const all = await listAllInvoices("org_test");
-    const stripeRow = all.find((i) => i.id.startsWith("inv_mock_"))!;
-    expect(stripeRow.status).toBe("OPEN");
+  it("returns DB invoices sorted by periodStart desc", async () => {
+    const all = await listAllInvoices("org_1");
+    expect(all).toHaveLength(1);
+    expect(all[0].id).toBe("db_inv_1");
+    expect(all[0].status).toBe("PAID");
   });
 });
 
@@ -146,6 +162,58 @@ describe("recordUsageEvent", () => {
       const call = usageEventCreate.mock.calls[0][0] as { data: { unitCents: number } };
       expect(call.data.unitCents).toBe(expected);
     }
+  });
+
+  it("uses default orgId when omitted", async () => {
+    usageEventCreate.mockClear();
+    await recordUsageEvent("MONITORING");
+    const call = usageEventCreate.mock.calls[0][0] as { data: { orgId: string } };
+    expect(call.data.orgId).toBe("org_1");
+  });
+
+  it("works without providerId", async () => {
+    usageEventCreate.mockClear();
+    const event = await recordUsageEvent("LICENSE");
+    const call = usageEventCreate.mock.calls[0][0] as { data: { providerId?: string } };
+    expect(call.data.providerId).toBeUndefined();
+    expect(event.type).toBe("LICENSE");
+  });
+});
+
+describe("isValidUsageType", () => {
+  it("returns true for valid types", () => {
+    expect(isValidUsageType("CREDENTIALING")).toBe(true);
+    expect(isValidUsageType("LICENSE")).toBe(true);
+    expect(isValidUsageType("ENROLLMENT")).toBe(true);
+    expect(isValidUsageType("MONITORING")).toBe(true);
+  });
+
+  it("returns false for invalid types", () => {
+    expect(isValidUsageType("INVALID")).toBe(false);
+    expect(isValidUsageType("")).toBe(false);
+    expect(isValidUsageType("credentialing")).toBe(false);
+  });
+});
+
+describe("getInvoiceById", () => {
+  it("returns invoice with events when found and org matches", async () => {
+    invoiceFindUnique.mockResolvedValueOnce({ id: "inv_1", orgId: "org_1", events: [{ id: "ev_1" }] });
+    const result = await getInvoiceById("inv_1", "org_1");
+    expect(result).toBeDefined();
+    expect(result!.id).toBe("inv_1");
+    expect(result!.events).toHaveLength(1);
+  });
+
+  it("returns null when invoice belongs to different org", async () => {
+    invoiceFindUnique.mockResolvedValueOnce({ id: "inv_1", orgId: "org_2" });
+    const result = await getInvoiceById("inv_1", "org_1");
+    expect(result).toBeNull();
+  });
+
+  it("returns null when invoice not found", async () => {
+    invoiceFindUnique.mockResolvedValueOnce(null);
+    const result = await getInvoiceById("ghost", "org_1");
+    expect(result).toBeNull();
   });
 });
 

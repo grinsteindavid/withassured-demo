@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { registerDbSync, reconcileAll, startComplianceScheduler } from "@/lib/temporal/lifecycle";
+import { syncStripeMockFromDB } from "@/lib/stripe-mock";
 
 registerDbSync();
 reconcileAll().catch(() => {});
 startComplianceScheduler();
+syncStripeMockFromDB().catch(() => {});
 
 export const metadata: Metadata = {
   title: "Assured Dashboard",

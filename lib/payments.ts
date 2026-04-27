@@ -11,7 +11,6 @@ import {
   type PaymentMethodDetails,
   type Subscription,
 } from "@/lib/stripe-mock";
-import { getCurrentUsage } from "@/lib/billing";
 
 export const SUBSCRIPTION_PRICING = {
   STARTUP: { platformFeeCents: 29_900, name: "Startup" },
@@ -142,15 +141,28 @@ export async function createSubscription(
   });
 
   if (existing) {
-    // Update existing subscription
+    // Update existing subscription (reactivation or plan change)
+    const now = new Date();
+    const periodEnd = new Date(now);
+    periodEnd.setMonth(periodEnd.getMonth() + 1);
+
     const stripeSub = stripeUpdateSubscription({
       customerId: orgId,
       plan,
+      status: "ACTIVE",
+      currentPeriodStart: now.toISOString(),
+      currentPeriodEnd: periodEnd.toISOString(),
     });
 
     await (prisma as any).subscription.update({
       where: { orgId },
-      data: { plan, status: "ACTIVE" },
+      data: {
+        plan,
+        status: "ACTIVE",
+        currentPeriodStart: now,
+        currentPeriodEnd: periodEnd,
+        cancelAtPeriodEnd: false,
+      },
     });
 
     return stripeSub!;
@@ -192,72 +204,12 @@ export async function cancelSubscription(orgId: string): Promise<Subscription | 
   const stripeSubscription = stripeCancelSubscription(orgId);
   if (!stripeSubscription) return null;
 
-  // Update in DB
+  // Update in DB - immediate cancellation
   await (prisma as any).subscription.update({
     where: { orgId },
-    data: { cancelAtPeriodEnd: true },
+    data: { status: "CANCELED", cancelAtPeriodEnd: false },
   });
 
   return stripeSubscription;
 }
 
-export async function generateMonthlyInvoice(orgId: string): Promise<void> {
-  const subscription = await (prisma as any).subscription.findUnique({
-    where: { orgId },
-  });
-
-  if (!subscription || subscription.status !== "ACTIVE") {
-    return;
-  }
-
-  // Get current period usage
-  const usage = await getCurrentUsage("current", orgId);
-
-  // Create invoice in Stripe mock
-  const { createInvoice } = await import("@/lib/stripe-mock");
-  const lines = usage.lines.map((line) => ({
-    description: `${line.type} (${line.count} × $${line.unitCents / 100})`,
-    amount: line.subtotalCents,
-    quantity: line.count,
-  }));
-
-  // Add platform fee
-  lines.push({
-    description: `Platform Fee (${SUBSCRIPTION_PRICING[subscription.plan as keyof typeof SUBSCRIPTION_PRICING].name})`,
-    amount: usage.platformFeeCents,
-    quantity: 1,
-  });
-
-  const stripeInvoice = createInvoice({
-    customerId: orgId,
-    lines,
-    autoAdvance: true,
-  });
-
-  // Create invoice in DB
-  const now = new Date();
-  const periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-
-  await prisma.invoice.create({
-    data: {
-      orgId,
-      periodStart,
-      periodEnd,
-      subtotalCents: usage.subtotalCents,
-      totalCents: usage.totalCents,
-      status: "OPEN",
-      lineItems: usage.lines as any,
-    },
-  });
-
-  // Mark usage events as invoiced
-  await prisma.usageEvent.updateMany({
-    where: {
-      orgId,
-      occurredAt: { gte: periodStart, lte: periodEnd },
-      invoiceId: null,
-    },
-    data: { invoiceId: stripeInvoice.id },
-  });
-}

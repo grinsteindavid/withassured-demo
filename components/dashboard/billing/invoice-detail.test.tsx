@@ -33,8 +33,8 @@ describe("<InvoiceDetail />", () => {
     render(<InvoiceDetail invoice={invoice} paymentMethods={[]} />);
 
     expect(screen.getByText(/Invoice inv_1/)).toBeTruthy();
-    expect(screen.getByText(/January 1, 2024/)).toBeTruthy();
-    expect(screen.getByText(/January 31, 2024/)).toBeTruthy();
+    expect(screen.getByText(/Jan 1, 2024/)).toBeTruthy();
+    expect(screen.getByText(/Jan 31, 2024/)).toBeTruthy();
   });
 
   it("renders line items with amounts", () => {

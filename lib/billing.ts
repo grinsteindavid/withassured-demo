@@ -1,8 +1,8 @@
 import { prisma } from "@/lib/db";
-import { listInvoices, payInvoice, createMeterEvent } from "@/lib/stripe-mock";
+import { payInvoice, createMeterEvent } from "@/lib/stripe-mock";
+import { SUBSCRIPTION_PRICING } from "@/lib/payments";
 
 export const PRICING = {
-  platformFeeCents: 150_000,
   unitPriceCredentialing: 19_900,
   unitPriceLicense: 9_900,
   unitPriceEnrollment: 14_900,
@@ -50,18 +50,26 @@ export function periodRange(period: "current" | "previous", now: Date = new Date
 
 export async function getCurrentUsage(period: "current" | "previous", orgId: string) {
   const { periodStart, periodEnd } = periodRange(period);
-  const events = await prisma.usageEvent.findMany({
-    where: {
-      occurredAt: { gte: periodStart, lte: periodEnd },
-      invoiceId: null,
-      orgId,
-    },
-  });
+  const [events, subscription] = await Promise.all([
+    prisma.usageEvent.findMany({
+      where: {
+        occurredAt: { gte: periodStart, lte: periodEnd },
+        invoiceId: null,
+        orgId,
+      },
+    }),
+    (prisma as any).subscription.findUnique({ where: { orgId } }),
+  ]);
+
+  const platformFeeCents = subscription?.plan
+    ? SUBSCRIPTION_PRICING[subscription.plan as keyof typeof SUBSCRIPTION_PRICING].platformFeeCents
+    : 0;
+
   return {
     periodStart,
     periodEnd,
     ...rollupUsage({
-      platformFeeCents: PRICING.platformFeeCents,
+      platformFeeCents,
       events: events.map((e) => ({ type: e.type, unitCents: e.unitCents })),
     }),
   };
@@ -71,18 +79,8 @@ export async function listAllInvoices(orgId: string) {
   const dbInvoices = await prisma.invoice.findMany({
     where: { orgId },
   });
-  const mockInvoices = listInvoices(orgId).map((inv) => ({
-    id: inv.id,
-    orgId: inv.customer,
-    periodStart: new Date(inv.created_at),
-    periodEnd: new Date(inv.created_at),
-    subtotalCents: inv.amount_due,
-    totalCents: inv.amount_due,
-    status: inv.status.toUpperCase() as "OPEN" | "PAID" | "VOID",
-    lineItems: inv.lines,
-  }));
 
-  return [...dbInvoices, ...mockInvoices].sort(
+  return dbInvoices.sort(
     (a, b) => new Date(b.periodStart).getTime() - new Date(a.periodStart).getTime(),
   );
 }

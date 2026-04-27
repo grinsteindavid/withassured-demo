@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { PlanSelector } from "./plan-selector";
+import { formatDate } from "@/lib/format";
 import type { Subscription } from "@/lib/stripe-mock";
 
 export function SubscriptionCard({
@@ -14,24 +16,7 @@ export function SubscriptionCard({
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-
-  const handleUpgrade = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/payments/subscription", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan: "GROWTH" }),
-      });
-      if (res.ok) {
-        router.refresh();
-      }
-    } catch (error) {
-      console.error("Failed to upgrade subscription:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [showPlanSelector, setShowPlanSelector] = useState(false);
 
   const handleCancel = async () => {
     setLoading(true);
@@ -57,9 +42,14 @@ export function SubscriptionCard({
             <h3 className="text-lg font-semibold">Subscription</h3>
             <p className="text-sm text-muted-foreground">No active subscription</p>
           </div>
-          <Button onClick={handleUpgrade} disabled={loading}>
+          <Button onClick={() => setShowPlanSelector(true)} disabled={loading}>
             {loading ? "Processing..." : "Subscribe"}
           </Button>
+          {showPlanSelector && (
+            <div className="mt-4">
+              <PlanSelector currentPlan={null} onClose={() => setShowPlanSelector(false)} />
+            </div>
+          )}
         </div>
       </Card>
     );
@@ -78,12 +68,7 @@ export function SubscriptionCard({
     TRIALING: "default",
   };
 
-  const periodEnd = new Date(subscription.currentPeriodEnd);
-  const formattedPeriodEnd = periodEnd.toLocaleDateString("en-US", {
-    month: "long",
-    year: "numeric",
-    day: "numeric",
-  });
+  const formattedPeriodEnd = formatDate(subscription.currentPeriodEnd);
 
   return (
     <Card className="p-6">
@@ -97,9 +82,11 @@ export function SubscriptionCard({
             </Badge>
           </div>
         </div>
-        <Button variant="outline" size="sm" onClick={handleUpgrade} disabled={loading}>
-          {loading ? "Processing..." : "Change Plan"}
-        </Button>
+        {subscription.status === "ACTIVE" && (
+          <Button variant="outline" size="sm" onClick={() => setShowPlanSelector(true)} disabled={loading}>
+            {loading ? "Processing..." : "Change Plan"}
+          </Button>
+        )}
       </div>
 
       <div className="space-y-2 text-sm">
@@ -107,15 +94,9 @@ export function SubscriptionCard({
           <span className="text-muted-foreground">Current period ends:</span>
           <span className="font-medium">{formattedPeriodEnd}</span>
         </div>
-        {subscription.cancelAtPeriodEnd && (
-          <div className="flex justify-between text-destructive">
-            <span>Cancellation scheduled:</span>
-            <span className="font-medium">Will cancel on {formattedPeriodEnd}</span>
-          </div>
-        )}
       </div>
 
-      {!subscription.cancelAtPeriodEnd && subscription.status === "ACTIVE" && (
+      {subscription.status === "ACTIVE" && (
         <div className="mt-4 pt-4 border-t">
           <Button
             variant="ghost"
@@ -126,6 +107,25 @@ export function SubscriptionCard({
           >
             {loading ? "Processing..." : "Cancel Subscription"}
           </Button>
+        </div>
+      )}
+
+      {subscription.status === "CANCELED" && (
+        <div className="mt-4 pt-4 border-t">
+          <Button
+            variant="default"
+            size="sm"
+            onClick={() => setShowPlanSelector(true)}
+            disabled={loading}
+          >
+            {loading ? "Processing..." : "Subscribe Again"}
+          </Button>
+        </div>
+      )}
+
+      {showPlanSelector && (
+        <div className="mt-4">
+          <PlanSelector currentPlan={subscription.plan} onClose={() => setShowPlanSelector(false)} />
         </div>
       )}
     </Card>

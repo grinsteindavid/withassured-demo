@@ -44,12 +44,7 @@ describe("<SubscriptionCard />", () => {
     expect(screen.getByText("Change Plan")).toBeTruthy();
   });
 
-  it("calls upgrade API on change plan click", async () => {
-    const fetchMock = mock(() =>
-      Promise.resolve({ ok: true } as Response)
-    );
-    global.fetch = fetchMock as unknown as typeof fetch;
-
+  it("shows PlanSelector when Change Plan is clicked", async () => {
     const subscription = {
       id: "sub_1",
       customer: "cust_1",
@@ -66,15 +61,7 @@ describe("<SubscriptionCard />", () => {
     const changePlanButton = screen.getByText("Change Plan");
     await userEvent.click(changePlanButton);
 
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/api/payments/subscription",
-      expect.objectContaining({
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan: "GROWTH" }),
-      })
-    );
-    expect(refresh).toHaveBeenCalled();
+    expect(screen.getByText("Select a Plan")).toBeTruthy();
   });
 
   it("calls cancel API and refreshes on cancel click", async () => {
@@ -106,26 +93,8 @@ describe("<SubscriptionCard />", () => {
     expect(refresh).toHaveBeenCalled();
   });
 
-  it("shows cancellation scheduled message when cancelAtPeriodEnd is true", () => {
-    const subscription = {
-      id: "sub_1",
-      customer: "cust_1",
-      plan: "GROWTH" as const,
-      status: "ACTIVE" as const,
-      currentPeriodStart: "2024-01-01T00:00:00Z",
-      currentPeriodEnd: "2024-02-01T00:00:00Z",
-      cancelAtPeriodEnd: true,
-      created_at: "2024-01-01T00:00:00Z",
-    };
 
-    render(<SubscriptionCard subscription={subscription} />);
-
-    expect(screen.getByText(/Cancellation scheduled:/)).toBeTruthy();
-    expect(screen.getByText(/Will cancel on/)).toBeTruthy();
-    expect(screen.queryByText("Cancel Subscription")).toBeNull();
-  });
-
-  it("shows past due status with destructive badge", () => {
+  it("shows past due status with destructive badge and hides Change Plan", () => {
     const subscription = {
       id: "sub_1",
       customer: "cust_1",
@@ -141,9 +110,10 @@ describe("<SubscriptionCard />", () => {
 
     expect(screen.getByText("PAST_DUE")).toBeTruthy();
     expect(screen.getByText("Startup")).toBeTruthy();
+    expect(screen.queryByText("Change Plan")).toBeNull();
   });
 
-  it("shows canceled status with secondary badge", () => {
+  it("shows canceled status with secondary badge and Subscribe Again button", () => {
     const subscription = {
       id: "sub_1",
       customer: "cust_1",
@@ -159,5 +129,28 @@ describe("<SubscriptionCard />", () => {
 
     expect(screen.getByText("CANCELED")).toBeTruthy();
     expect(screen.getByText("Enterprise")).toBeTruthy();
+    expect(screen.getByText("Subscribe Again")).toBeTruthy();
+    expect(screen.queryByText("Change Plan")).toBeNull();
+    expect(screen.queryByText("Cancel Subscription")).toBeNull();
+  });
+
+  it("shows PlanSelector when Subscribe Again is clicked", async () => {
+    const subscription = {
+      id: "sub_1",
+      customer: "cust_1",
+      plan: "ENTERPRISE" as const,
+      status: "CANCELED" as const,
+      currentPeriodStart: "2024-01-01T00:00:00Z",
+      currentPeriodEnd: "2024-02-01T00:00:00Z",
+      cancelAtPeriodEnd: false,
+      created_at: "2024-01-01T00:00:00Z",
+    };
+
+    render(<SubscriptionCard subscription={subscription} />);
+
+    const subscribeAgainButton = screen.getByText("Subscribe Again");
+    await userEvent.click(subscribeAgainButton);
+
+    expect(screen.getByText("Select a Plan")).toBeTruthy();
   });
 });

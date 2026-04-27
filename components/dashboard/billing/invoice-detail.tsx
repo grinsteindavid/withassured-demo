@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { StatusBadge } from "@/components/dashboard/status-badge";
 import { useRouter } from "next/navigation";
+import { formatDate } from "@/lib/format";
 
 export function InvoiceDetail({
   invoice,
@@ -54,14 +55,6 @@ export function InvoiceDetail({
     link.href = "#";
     link.download = `invoice-${invoice.id}.pdf`;
     link.click();
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      month: "long",
-      year: "numeric",
-      day: "numeric",
-    });
   };
 
   const formatCents = (cents: number) => {

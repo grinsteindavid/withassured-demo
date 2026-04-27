@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "bun:test";
+import { describe, it, expect, beforeEach, mock } from "bun:test";
 import {
   createInvoice,
   payInvoice,
@@ -7,7 +7,22 @@ import {
   listInvoices,
   getInvoice,
   resetMockState,
+  syncStripeMockFromDB,
+  listPaymentMethods,
+  getSubscription,
 } from "./stripe-mock";
+
+const paymentMethodFindMany = mock(async () => [] as unknown[]);
+const subscriptionFindMany = mock(async () => [] as unknown[]);
+const invoiceFindMany = mock(async () => [] as unknown[]);
+
+mock.module("@/lib/db", () => ({
+  prisma: {
+    paymentMethod: { findMany: paymentMethodFindMany },
+    subscription: { findMany: subscriptionFindMany },
+    invoice: { findMany: invoiceFindMany },
+  },
+}));
 
 describe("stripe-mock", () => {
   beforeEach(() => {
@@ -113,5 +128,196 @@ describe("stripe-mock", () => {
       expect(getInvoice(invoice.id)?.amount_due).toBe(500);
       expect(getInvoice("missing")).toBeUndefined();
     });
+  });
+});
+
+describe("Global State Pattern", () => {
+  it("stores state in globalThis", () => {
+    const globalForStripe = globalThis as unknown as {
+      stripeState?: unknown;
+    };
+    expect(globalForStripe.stripeState).toBeDefined();
+  });
+
+  it("initializes empty state on first load", () => {
+    resetMockState();
+    const invoice = createInvoice({
+      customerId: "org_test",
+      lines: [{ description: "Test", amount: 100, quantity: 1 }],
+    });
+    expect(invoice.id).toBeTruthy();
+  });
+
+  it("preserves state across module reload simulation", () => {
+    resetMockState();
+    const invoice1 = createInvoice({
+      customerId: "org_test",
+      lines: [{ description: "Test", amount: 100, quantity: 1 }],
+    });
+    const invoiceId = invoice1.id;
+
+    // Simulate state persistence (in real hot-reload, globalThis persists)
+    const globalForStripe = globalThis as unknown as {
+      stripeState?: { invoices: Map<string, unknown> };
+    };
+    const invoices = globalForStripe.stripeState?.invoices;
+    expect(invoices?.has(invoiceId)).toBe(true);
+  });
+});
+
+describe("syncStripeMockFromDB", () => {
+  beforeEach(() => {
+    resetMockState();
+    paymentMethodFindMany.mockClear();
+    subscriptionFindMany.mockClear();
+    invoiceFindMany.mockClear();
+  });
+
+  it("syncs payment methods from DB to Stripe mock", async () => {
+    paymentMethodFindMany.mockResolvedValueOnce([
+      {
+        id: "pm_db_1",
+        stripePaymentMethodId: "pm_mock_123",
+        orgId: "org_1",
+        type: "CARD",
+        last4: "4242",
+        expiryMonth: 12,
+        expiryYear: 2025,
+        brand: "Visa",
+        isDefault: true,
+        createdAt: new Date("2026-01-01"),
+      },
+    ]);
+
+    await syncStripeMockFromDB();
+
+    const methods = listPaymentMethods("org_1");
+    expect(methods).toHaveLength(1);
+    expect(methods[0].id).toBe("pm_mock_123");
+    expect(methods[0].type).toBe("card");
+    expect(methods[0].last4).toBe("4242");
+    expect(methods[0].isDefault).toBe(true);
+  });
+
+  it("syncs subscriptions from DB to Stripe mock", async () => {
+    subscriptionFindMany.mockResolvedValueOnce([
+      {
+        id: "sub_db_1",
+        orgId: "org_1",
+        plan: "STARTUP",
+        status: "ACTIVE",
+        currentPeriodStart: new Date("2026-01-01"),
+        currentPeriodEnd: new Date("2026-02-01"),
+        cancelAtPeriodEnd: false,
+        createdAt: new Date("2026-01-01"),
+      },
+    ]);
+
+    await syncStripeMockFromDB();
+
+    const subscription = getSubscription("org_1");
+    expect(subscription).toBeDefined();
+    expect(subscription?.id).toBe("sub_db_1");
+    expect(subscription?.plan).toBe("STARTUP");
+    expect(subscription?.status).toBe("ACTIVE");
+  });
+
+  it("syncs invoices from DB to Stripe mock", async () => {
+    invoiceFindMany.mockResolvedValueOnce([
+      {
+        id: "inv_db_1",
+        orgId: "org_1",
+        totalCents: 5000,
+        status: "OPEN",
+        lineItems: [{ description: "Test", amount: 5000, quantity: 1 }],
+        createdAt: new Date("2026-01-01"),
+      },
+    ]);
+
+    await syncStripeMockFromDB();
+
+    const invoices = listInvoices("org_1");
+    const dbInvoice = invoices.find((inv) => inv.id === "inv_db_1");
+    expect(dbInvoice).toBeDefined();
+    expect(dbInvoice?.amount_due).toBe(5000);
+    expect(dbInvoice?.status).toBe("open");
+  });
+
+  it("transforms DB types to Stripe mock types", async () => {
+    paymentMethodFindMany.mockResolvedValueOnce([
+      {
+        id: "pm_db_1",
+        stripePaymentMethodId: "pm_mock_123",
+        orgId: "org_1",
+        type: "CARD",
+        last4: "4242",
+        expiryMonth: 12,
+        expiryYear: 2025,
+        brand: "Visa",
+        isDefault: true,
+        createdAt: new Date("2026-01-01"),
+      },
+    ]);
+    invoiceFindMany.mockResolvedValueOnce([
+      {
+        id: "inv_db_1",
+        orgId: "org_1",
+        totalCents: 5000,
+        status: "OPEN",
+        lineItems: [{ description: "Test", amount: 5000, quantity: 1 }],
+        createdAt: new Date("2026-01-01"),
+      },
+    ]);
+
+    await syncStripeMockFromDB();
+
+    const methods = listPaymentMethods("org_1");
+    expect(methods[0].type).toBe("card"); // CARD → card
+
+    const invoices = listInvoices("org_1");
+    const dbInvoice = invoices.find((inv) => inv.id === "inv_db_1");
+    expect(dbInvoice?.status).toBe("open"); // OPEN → open
+  });
+
+  it("handles empty DB gracefully", async () => {
+    paymentMethodFindMany.mockResolvedValueOnce([]);
+    subscriptionFindMany.mockResolvedValueOnce([]);
+    invoiceFindMany.mockResolvedValueOnce([]);
+
+    await syncStripeMockFromDB();
+
+    expect(listPaymentMethods("org_1")).toHaveLength(0);
+    expect(getSubscription("org_1")).toBeUndefined();
+    expect(listInvoices("org_1")).toHaveLength(0);
+  });
+});
+
+describe("Post-Sync Functionality", () => {
+  beforeEach(() => {
+    resetMockState();
+    paymentMethodFindMany.mockClear();
+  });
+
+  it("listPaymentMethods returns synced data", async () => {
+    paymentMethodFindMany.mockResolvedValueOnce([
+      {
+        id: "pm_db_1",
+        stripePaymentMethodId: "pm_mock_123",
+        orgId: "org_1",
+        type: "CARD",
+        last4: "4242",
+        expiryMonth: 12,
+        expiryYear: 2025,
+        brand: "Visa",
+        isDefault: true,
+        createdAt: new Date("2026-01-01"),
+      },
+    ]);
+
+    await syncStripeMockFromDB();
+
+    const methods = listPaymentMethods("org_1");
+    expect(methods).toHaveLength(1);
+    expect(methods[0].id).toBe("pm_mock_123");
   });
 });

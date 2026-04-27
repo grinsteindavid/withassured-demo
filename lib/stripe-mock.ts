@@ -45,23 +45,44 @@ export type Subscription = {
   created_at: string;
 };
 
-let invoiceCounter = 0;
-let eventCounter = 0;
-let paymentMethodCounter = 0;
-let subscriptionCounter = 0;
+type StripeState = {
+  paymentMethods: Map<string, PaymentMethodDetails>;
+  subscriptions: Map<string, Subscription>;
+  invoices: Map<string, StripeInvoice>;
+  meterEvents: Map<string, MeterEvent[]>;
+  paymentMethodCounter: number;
+  subscriptionCounter: number;
+  invoiceCounter: number;
+  eventCounter: number;
+};
 
-const invoices = new Map<string, StripeInvoice>();
-const meterEvents = new Map<string, MeterEvent[]>();
-const paymentMethods = new Map<string, PaymentMethodDetails>();
-const subscriptions = new Map<string, Subscription>();
+// Singleton pattern - survives Next.js hot-reload
+const globalForStripe = globalThis as unknown as {
+  stripeState?: StripeState;
+};
+
+const state: StripeState = globalForStripe.stripeState ?? {
+  paymentMethods: new Map(),
+  subscriptions: new Map(),
+  invoices: new Map(),
+  meterEvents: new Map(),
+  paymentMethodCounter: 0,
+  subscriptionCounter: 0,
+  invoiceCounter: 0,
+  eventCounter: 0,
+};
+
+if (process.env.NODE_ENV !== "production") {
+  globalForStripe.stripeState = state;
+}
 
 export function createInvoice(params: {
   customerId: string;
   lines: StripeInvoiceLine[];
   autoAdvance?: boolean;
 }): StripeInvoice {
-  invoiceCounter++;
-  const id = `inv_mock_${invoiceCounter}`;
+  state.invoiceCounter++;
+  const id = `inv_mock_${state.invoiceCounter}`;
   const amount_due = params.lines.reduce((sum, line) => sum + line.amount, 0);
 
   const invoice: StripeInvoice = {
@@ -74,12 +95,12 @@ export function createInvoice(params: {
     created_at: new Date().toISOString(),
   };
 
-  invoices.set(id, invoice);
+  state.invoices.set(id, invoice);
   return invoice;
 }
 
 export function payInvoice(invoiceId: string): { invoice: StripeInvoice; paymentIntentId: string } | null {
-  const invoice = invoices.get(invoiceId);
+  const invoice = state.invoices.get(invoiceId);
   if (!invoice) return null;
   if (invoice.status !== "open" && invoice.status !== "draft") return null;
 
@@ -94,23 +115,23 @@ export function createMeterEvent(params: {
   timestamp?: string;
   value?: number;
 }): MeterEvent {
-  eventCounter++;
+  state.eventCounter++;
   const event: MeterEvent = {
-    id: `me_mock_${eventCounter}`,
+    id: `me_mock_${state.eventCounter}`,
     event_name: params.event_name,
     customer: params.customer,
     timestamp: params.timestamp || new Date().toISOString(),
     value: params.value ?? 1,
   };
 
-  const existing = meterEvents.get(params.customer) || [];
+  const existing = state.meterEvents.get(params.customer) || [];
   existing.push(event);
-  meterEvents.set(params.customer, existing);
+  state.meterEvents.set(params.customer, existing);
   return event;
 }
 
 export function getSubscriptionItems(customerId: string): Record<string, number> {
-  const events = meterEvents.get(customerId) || [];
+  const events = state.meterEvents.get(customerId) || [];
   const counts: Record<string, number> = {};
   for (const event of events) {
     counts[event.event_name] = (counts[event.event_name] || 0) + event.value;
@@ -119,23 +140,23 @@ export function getSubscriptionItems(customerId: string): Record<string, number>
 }
 
 export function listInvoices(customerId?: string): StripeInvoice[] {
-  const all = Array.from(invoices.values());
+  const all = Array.from(state.invoices.values());
   return customerId ? all.filter((inv) => inv.customer === customerId) : all;
 }
 
 export function getInvoice(invoiceId: string): StripeInvoice | undefined {
-  return invoices.get(invoiceId);
+  return state.invoices.get(invoiceId);
 }
 
 export function resetMockState(): void {
-  invoices.clear();
-  meterEvents.clear();
-  paymentMethods.clear();
-  subscriptions.clear();
-  invoiceCounter = 0;
-  eventCounter = 0;
-  paymentMethodCounter = 0;
-  subscriptionCounter = 0;
+  state.invoices.clear();
+  state.meterEvents.clear();
+  state.paymentMethods.clear();
+  state.subscriptions.clear();
+  state.invoiceCounter = 0;
+  state.eventCounter = 0;
+  state.paymentMethodCounter = 0;
+  state.subscriptionCounter = 0;
 }
 
 export function createPaymentMethod(params: {
@@ -147,12 +168,12 @@ export function createPaymentMethod(params: {
   brand?: string;
   setDefault?: boolean;
 }): PaymentMethodDetails {
-  paymentMethodCounter++;
-  const id = `pm_mock_${paymentMethodCounter}`;
+  state.paymentMethodCounter++;
+  const id = `pm_mock_${state.paymentMethodCounter}`;
 
   // If setDefault is true, unset default on all other methods for this customer
   if (params.setDefault) {
-    for (const pm of paymentMethods.values()) {
+    for (const pm of state.paymentMethods.values()) {
       if (pm.customer === params.customerId) {
         pm.isDefault = false;
       }
@@ -171,23 +192,23 @@ export function createPaymentMethod(params: {
     created_at: new Date().toISOString(),
   };
 
-  paymentMethods.set(id, paymentMethod);
+  state.paymentMethods.set(id, paymentMethod);
   return paymentMethod;
 }
 
 export function listPaymentMethods(customerId: string): PaymentMethodDetails[] {
-  const all = Array.from(paymentMethods.values());
+  const all = Array.from(state.paymentMethods.values());
   return all.filter((pm) => pm.customer === customerId);
 }
 
 export function setDefaultPaymentMethod(paymentMethodId: string): boolean {
-  const paymentMethod = paymentMethods.get(paymentMethodId);
+  const paymentMethod = state.paymentMethods.get(paymentMethodId);
   if (!paymentMethod) return false;
 
   const customerId = paymentMethod.customer;
 
   // Unset default on all methods for this customer
-  for (const pm of paymentMethods.values()) {
+  for (const pm of state.paymentMethods.values()) {
     if (pm.customer === customerId) {
       pm.isDefault = false;
     }
@@ -199,10 +220,10 @@ export function setDefaultPaymentMethod(paymentMethodId: string): boolean {
 }
 
 export function deletePaymentMethod(paymentMethodId: string): boolean {
-  const paymentMethod = paymentMethods.get(paymentMethodId);
+  const paymentMethod = state.paymentMethods.get(paymentMethodId);
   if (!paymentMethod) return false;
 
-  paymentMethods.delete(paymentMethodId);
+  state.paymentMethods.delete(paymentMethodId);
   return true;
 }
 
@@ -210,8 +231,8 @@ export function createSubscription(params: {
   customerId: string;
   plan: "STARTUP" | "GROWTH" | "ENTERPRISE";
 }): Subscription {
-  subscriptionCounter++;
-  const id = `sub_mock_${subscriptionCounter}`;
+  state.subscriptionCounter++;
+  const id = `sub_mock_${state.subscriptionCounter}`;
 
   const now = new Date();
   const periodEnd = new Date(now);
@@ -228,12 +249,12 @@ export function createSubscription(params: {
     created_at: now.toISOString(),
   };
 
-  subscriptions.set(id, subscription);
+  state.subscriptions.set(id, subscription);
   return subscription;
 }
 
 export function getSubscription(customerId: string): Subscription | undefined {
-  const all = Array.from(subscriptions.values());
+  const all = Array.from(state.subscriptions.values());
   return all.find((sub) => sub.customer === customerId);
 }
 
@@ -241,17 +262,77 @@ export function cancelSubscription(customerId: string): Subscription | null {
   const subscription = getSubscription(customerId);
   if (!subscription) return null;
 
-  subscription.cancelAtPeriodEnd = true;
+  subscription.status = "CANCELED";
+  subscription.cancelAtPeriodEnd = false;
   return subscription;
 }
 
 export function updateSubscription(params: {
   customerId: string;
   plan: "STARTUP" | "GROWTH" | "ENTERPRISE";
+  status?: "ACTIVE" | "PAST_DUE" | "CANCELED" | "TRIALING";
+  currentPeriodStart?: string;
+  currentPeriodEnd?: string;
 }): Subscription | null {
   const subscription = getSubscription(params.customerId);
   if (!subscription) return null;
 
   subscription.plan = params.plan;
+  if (params.status) subscription.status = params.status;
+  if (params.currentPeriodStart) subscription.currentPeriodStart = params.currentPeriodStart;
+  if (params.currentPeriodEnd) subscription.currentPeriodEnd = params.currentPeriodEnd;
   return subscription;
+}
+
+// DB sync function - reads from Prisma and populates Stripe mock
+export async function syncStripeMockFromDB(): Promise<void> {
+  const { prisma } = await import("@/lib/db");
+
+  // Sync PaymentMethods
+  const dbPaymentMethods = await (prisma as any).paymentMethod.findMany();
+  for (const pm of dbPaymentMethods) {
+    state.paymentMethods.set(pm.stripePaymentMethodId, {
+      id: pm.stripePaymentMethodId,
+      type: pm.type.toLowerCase() as "card" | "ach",
+      last4: pm.last4,
+      expiryMonth: pm.expiryMonth,
+      expiryYear: pm.expiryYear,
+      brand: pm.brand,
+      customer: pm.orgId,
+      isDefault: pm.isDefault,
+      created_at: pm.createdAt.toISOString(),
+    });
+  }
+  state.paymentMethodCounter = dbPaymentMethods.length;
+
+  // Sync Subscriptions
+  const dbSubscriptions = await (prisma as any).subscription.findMany();
+  for (const sub of dbSubscriptions) {
+    state.subscriptions.set(sub.id, {
+      id: sub.id,
+      customer: sub.orgId,
+      plan: sub.plan,
+      status: sub.status,
+      currentPeriodStart: sub.currentPeriodStart.toISOString(),
+      currentPeriodEnd: sub.currentPeriodEnd.toISOString(),
+      cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
+      created_at: sub.createdAt.toISOString(),
+    });
+  }
+  state.subscriptionCounter = dbSubscriptions.length;
+
+  // Sync Invoices
+  const dbInvoices = await (prisma as any).invoice.findMany();
+  for (const inv of dbInvoices) {
+    state.invoices.set(inv.id, {
+      id: inv.id,
+      customer: inv.orgId,
+      status: inv.status.toLowerCase() as "draft" | "open" | "paid" | "void",
+      amount_due: inv.totalCents,
+      amount_paid: inv.status === "PAID" ? inv.totalCents : 0,
+      lines: inv.lineItems as StripeInvoiceLine[],
+      created_at: inv.createdAt.toISOString(),
+    });
+  }
+  state.invoiceCounter = dbInvoices.length;
 }

@@ -2,9 +2,18 @@ import { describe, it, expect, mock } from "bun:test";
 
 const mockUser = { id: "user_1", orgId: "org_1", email: "test@test.com" };
 const getSessionUserMock = mock(async () => mockUser);
+const requireActiveSubscriptionMock = mock(async () => true);
+const subscriptionBlockedResponseMock = mock(() =>
+  new Response(JSON.stringify({ error: "Subscription required" }), { status: 403 })
+);
 
 mock.module("@/lib/auth", () => ({
   getSessionUser: getSessionUserMock,
+}));
+
+mock.module("@/lib/subscription-guard", () => ({
+  requireActiveSubscription: requireActiveSubscriptionMock,
+  subscriptionBlockedResponse: subscriptionBlockedResponseMock,
 }));
 
 const mockListProviders = mock(async () => [
