@@ -19,7 +19,6 @@ cp .env.example .env
 |---|---|---|
 | `DATABASE_URL` | Postgres connection string. **Inside the container** the db host is `db`, not `localhost`. | `postgresql://postgres:postgres@db:5432/assured` |
 | `JWT_SECRET` | HS256 signing key for session JWT. | `development-secret-…` (override for anything non-local) |
-| `TEMPORAL_ADDRESS` | Documented but unused — the mock is in-process. | `localhost:7233` |
 | `E2E_USER_EMAIL` | Playwright login (must match a seeded user). | `admin@assured.test` |
 | `E2E_USER_PASSWORD` | Playwright password. | `password123` |
 

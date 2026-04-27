@@ -23,7 +23,6 @@ services:
       NODE_ENV: development
       DATABASE_URL: postgresql://postgres:postgres@db:5432/assured
       JWT_SECRET: ${JWT_SECRET:-development-secret-32-bytes-minimum-change-in-production}
-      TEMPORAL_ADDRESS: ${TEMPORAL_ADDRESS:-localhost:7233}
       E2E_USER_EMAIL: ${E2E_USER_EMAIL:-admin@assured.test}
       E2E_USER_PASSWORD: ${E2E_USER_PASSWORD:-password123}
       HOSTNAME: "0.0.0.0"

@@ -1,2 +1,15 @@
+# `bun test` configuration.
+# - preload registers the happy-dom + jest-dom matchers + network blocker.
+# - pathIgnorePatterns hides integration tests from default discovery so
+#   `bun test` (raw) only runs unit tests.
+# - Integration tests are run via `bun run test:integration`, which sets
+#   BUN_INTEGRATION_TESTS=1 (handled in test-utils/setup.ts) and overrides
+#   the ignore list with --path-ignore-patterns=''.
+#
+# Note: Bun supports a `[test.<name>]` "conditional config" syntax that
+# would let us declare a separate integration profile, but the corresponding
+# `--config=<name>` selector is broken in Bun 1.3.x (oven-sh/bun#25647), so
+# we keep a single [test] block and use an env var instead.
 [test]
-preload = ["./test/setup.ts"]
+preload = ["./test-utils/setup.ts"]
+pathIgnorePatterns = ["tests/integration/**"]
