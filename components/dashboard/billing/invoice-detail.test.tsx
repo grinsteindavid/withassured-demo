@@ -194,7 +194,15 @@ describe("<InvoiceDetail />", () => {
     const downloadButton = screen.getByText("Download PDF");
     await userEvent.click(downloadButton);
 
-    expect(fetchMock).toHaveBeenCalledWith("/api/billing/invoices/inv_1/pdf");
+    expect(fetchMock).toHaveBeenCalledWith("/api/billing/invoices/inv_1/pdf?download=1");
     expect(createObjectURLMock).toHaveBeenCalled();
+  });
+
+  it("renders inline PDF preview iframe", () => {
+    render(<InvoiceDetail invoice={invoice} paymentMethods={[]} />);
+
+    const iframe = document.querySelector("iframe") as HTMLIFrameElement;
+    expect(iframe).toBeTruthy();
+    expect(iframe.src).toContain("/api/billing/invoices/inv_1/pdf");
   });
 });

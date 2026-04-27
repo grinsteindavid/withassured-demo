@@ -59,7 +59,7 @@ export function InvoiceDetail({
   const handleDownload = async () => {
     setDownloading(true);
     try {
-      const res = await fetch(`/api/billing/invoices/${invoice.id}/pdf`);
+      const res = await fetch(`/api/billing/invoices/${invoice.id}/pdf?download=1`);
       if (!res.ok) {
         setPayError("Failed to download invoice PDF");
         return;
@@ -159,6 +159,15 @@ export function InvoiceDetail({
           Add a payment method to pay this invoice.
         </div>
       )}
+
+      <div className="mt-6 pt-6 border-t">
+        <h4 className="font-semibold mb-3">Invoice Preview</h4>
+        <iframe
+          src={`/api/billing/invoices/${invoice.id}/pdf`}
+          className="w-full h-[85vh] border rounded"
+          title={`Invoice ${invoice.id} preview`}
+        />
+      </div>
     </Card>
   );
 }

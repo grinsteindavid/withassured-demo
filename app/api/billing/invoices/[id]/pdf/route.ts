@@ -54,12 +54,19 @@ export async function GET(
     orgName,
   );
 
+  const url = new URL(_request.url);
+  const isDownload = url.searchParams.get("download") === "1";
+
   const body = new Uint8Array(pdfBytes);
+  const headers: Record<string, string> = {
+    "Content-Type": "application/pdf",
+  };
+  if (isDownload) {
+    headers["Content-Disposition"] = `attachment; filename="invoice-${id}.pdf"`;
+  }
+
   return new Response(body, {
     status: 200,
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="invoice-${id}.pdf"`,
-    },
+    headers,
   });
 }
