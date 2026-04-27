@@ -21,7 +21,7 @@ describe("<EnrollmentRow />", () => {
       workflowId: "enr_wf_1",
     };
 
-    render(<EnrollmentRow enrollment={enrollment} providerName="Dr. Smith" />);
+    render(<table><tbody><EnrollmentRow enrollment={enrollment} providerName="Dr. Smith" /></tbody></table>);
     
     expect(screen.getByText("Dr. Smith")).toBeTruthy();
     expect(screen.getByText("Blue Cross")).toBeTruthy();
@@ -38,7 +38,7 @@ describe("<EnrollmentRow />", () => {
       workflowId: "enr_wf_1",
     };
 
-    render(<EnrollmentRow enrollment={enrollment} />);
+    render(<table><tbody><EnrollmentRow enrollment={enrollment} /></tbody></table>);
     
     const viewButton = screen.getByText("View Workflow");
     expect(viewButton).toBeTruthy();
@@ -55,7 +55,7 @@ describe("<EnrollmentRow />", () => {
       workflowId: null,
     };
 
-    render(<EnrollmentRow enrollment={enrollment} />);
+    render(<table><tbody><EnrollmentRow enrollment={enrollment} /></tbody></table>);
     
     expect(screen.queryByText("View Workflow")).toBeNull();
     expect(screen.getByText("—")).toBeTruthy();
@@ -72,7 +72,7 @@ describe("<EnrollmentRow />", () => {
       workflowId: "enr_wf_1",
     };
 
-    render(<EnrollmentRow enrollment={enrollment} />);
+    render(<table><tbody><EnrollmentRow enrollment={enrollment} /></tbody></table>);
     
     expect(screen.getByText("APPROVED")).toBeTruthy();
   });
