@@ -19,6 +19,7 @@ cp .env.example .env
 |---|---|---|
 | `DATABASE_URL` | Postgres connection string. **Inside the container** the db host is `db`, not `localhost`. | `postgresql://postgres:postgres@db:5432/assured` |
 | `JWT_SECRET` | HS256 signing key for session JWT. | `development-secret-…` (override for anything non-local) |
+| `CRON_SECRET` | Authorization bearer for `GET /api/cron/compliance`. Vercel injects this on Pro+; set manually for local cron testing or non-Vercel hosts. | — |
 | `E2E_USER_EMAIL` | Playwright login (must match a seeded user). | `admin@assured.test` |
 | `E2E_USER_PASSWORD` | Playwright password. | `password123` |
 

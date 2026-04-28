@@ -31,6 +31,7 @@ services:
       WATCHPACK_POLLING: "true"
       CHOKIDAR_USEPOLLING: "true"
       CHOKIDAR_INTERVAL: "500"
+      CRON_SECRET: ${CRON_SECRET:-dev-cron-secret-local}
     ports:
       - "3000:3000"
     volumes:
@@ -45,6 +46,20 @@ services:
              bunx prisma migrate deploy &&
              bun run db:seed &&
              exec node node_modules/next/dist/bin/next dev"
+
+  cron:
+    image: curlimages/curl:latest
+    environment:
+      APP_URL: http://app:3000
+      ENDPOINT: /api/cron/compliance
+      CRON_SECRET: ${CRON_SECRET:-dev-cron-secret-local}
+    depends_on:
+      - app
+    command: >
+      sh -c "while true; do
+        curl -sfS -H \"Authorization: Bearer $$CRON_SECRET\" \"$$APP_URL$$ENDPOINT\" || true;
+        sleep 300;
+      done"
 
   studio:
     build:

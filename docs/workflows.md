@@ -73,6 +73,8 @@ Instead of a boot-time `setInterval`, compliance checks are driven by `vercel.js
 
 `GET /api/cron/compliance`:
 
+The route requires `Authorization: Bearer <CRON_SECRET>` (matched against `process.env.CRON_SECRET`) and returns 401 if the header is missing or invalid.
+
 1. Finds providers with at least one `ACTIVE` license and no `REVOKED` licenses.
 2. Creates a `ComplianceCheck` row (`source: "SCHEDULED_CHECK"`, `result: "CLEAN"`).
 3. Calls `start(complianceWorkflow, [workflowId])` to kick off the workflow.
