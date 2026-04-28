@@ -38,12 +38,21 @@ const subscriptionFindUnique = mock(async (_args: { where: { orgId: string } }) 
   plan: "STARTUP",
   status: "ACTIVE",
 }) as unknown);
+const billingPlanFindUnique = mock(async (_args: { where: { orgId: string } }) => ({
+  orgId: "org_1",
+  platformFeeCents: 150_000,
+  unitPriceCredentialing: 19_900,
+  unitPriceLicense: 9_900,
+  unitPriceEnrollment: 14_900,
+  unitPriceMonitoring: 2_900,
+}) as unknown);
 
 mock.module("@/lib/db", () => ({
   prisma: {
     usageEvent: { findMany: usageFindMany, create: usageEventCreate },
     invoice: { findMany: invoiceFindMany, findUnique: invoiceFindUnique, update: invoiceUpdate, updateMany: invoiceUpdateMany },
     subscription: { findUnique: subscriptionFindUnique },
+    billingPlan: { findUnique: billingPlanFindUnique },
   },
 }));
 
@@ -52,6 +61,14 @@ const { getCurrentUsage, listAllInvoices, recordUsageEvent, processInvoicePaymen
 
 beforeEach(() => {
   resetMockState();
+  usageFindMany.mockClear();
+  usageEventCreate.mockClear();
+  invoiceFindMany.mockClear();
+  invoiceFindUnique.mockClear();
+  invoiceUpdate.mockClear();
+  invoiceUpdateMany.mockClear();
+  subscriptionFindUnique.mockClear();
+  billingPlanFindUnique.mockClear();
 });
 
 describe("rollupUsage", () => {

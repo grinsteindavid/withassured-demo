@@ -59,7 +59,29 @@ export async function recordUsageEvent(
   orgId: string,
   providerId?: string,
 ) {
-  const unitCents = unitCentsFor(type);
+  const billingPlan = await prisma.billingPlan.findUnique({
+    where: { orgId },
+  });
+
+  let unitCents: number;
+  if (billingPlan) {
+    switch (type) {
+      case "CREDENTIALING":
+        unitCents = billingPlan.unitPriceCredentialing;
+        break;
+      case "LICENSE":
+        unitCents = billingPlan.unitPriceLicense;
+        break;
+      case "ENROLLMENT":
+        unitCents = billingPlan.unitPriceEnrollment;
+        break;
+      case "MONITORING":
+        unitCents = billingPlan.unitPriceMonitoring;
+        break;
+    }
+  } else {
+    unitCents = unitCentsFor(type);
+  }
 
   const event = await prisma.usageEvent.create({
     data: {

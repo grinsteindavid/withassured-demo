@@ -40,6 +40,10 @@ mock.module("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
+mock.module("@/components/dashboard/analytics/analytics-section", () => ({
+  AnalyticsSection: () => null,
+}));
+
 const { default: DashboardOverview } = await import("./page");
 
 beforeEach(() => {
@@ -53,7 +57,7 @@ describe("DashboardOverview", () => {
   it("filters data by orgId correctly", async () => {
     getSessionUserMock.mockResolvedValueOnce({ userId: "user_1", orgId: "org_test", role: "ADMIN" });
 
-    await DashboardOverview();
+    await DashboardOverview({ searchParams: {} });
 
     expect(count).toHaveBeenCalledWith({ where: { orgId: "org_test" } });
     expect(count).toHaveBeenCalledWith({
@@ -78,7 +82,7 @@ describe("DashboardOverview", () => {
     count.mockResolvedValueOnce(1);
     count.mockResolvedValueOnce(0);
 
-    const page = await DashboardOverview();
+    const page = await DashboardOverview({ searchParams: {} });
     expect(page).toBeTruthy();
   });
 
@@ -90,7 +94,7 @@ describe("DashboardOverview", () => {
     count.mockResolvedValueOnce(2); // compliance alerts
     count.mockResolvedValueOnce(1); // expired licenses
 
-    const page = await DashboardOverview();
+    const page = await DashboardOverview({ searchParams: {} });
     expect(page).toBeTruthy();
 
     // Verify the correct counts were queried

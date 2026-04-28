@@ -1,8 +1,10 @@
 import { getDashboardMetrics } from "@/lib/enrollment";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { AnalyticsSection } from "@/components/dashboard/analytics/analytics-section";
+import { WorkflowHeartbeat } from "@/components/dashboard/workflow-heartbeat";
 
-export default async function DashboardOverview() {
+export default async function DashboardOverview({ searchParams }: { searchParams: { days?: string } }) {
   const user = await getSessionUser();
   const org = await prisma.organization.findUnique({
     where: { id: user!.orgId },
@@ -10,9 +12,11 @@ export default async function DashboardOverview() {
   });
 
   const { totalProviders, activeCredentials, pendingEnrollments, complianceAlerts, expiredLicenses } = await getDashboardMetrics(user!.orgId);
+  const days = searchParams.days ? parseInt(searchParams.days, 10) : 90;
 
   return (
     <div>
+      <WorkflowHeartbeat />
       <h1 data-testid="dashboard-heading" className="mb-6 text-2xl font-bold">
         {org?.name ?? "Dashboard"} Overview
       </h1>
@@ -38,6 +42,8 @@ export default async function DashboardOverview() {
           <p className="text-2xl font-bold">{expiredLicenses}</p>
         </div>
       </div>
+
+      <AnalyticsSection orgId={user!.orgId} days={days} />
     </div>
   );
 }

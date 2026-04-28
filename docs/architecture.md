@@ -34,6 +34,7 @@ How the pieces fit together, the seams designed for production swap-in, and what
 | **JWT + HTTP-only cookie auth** | Hand-rolled (`jose` + `bcryptjs`); edge-compatible. No third-party. |
 | **Vercel Workflows** | Database-backed via Prisma `Workflow` table; Vercel Workflow SDK for execution. |
 | **Tailwind v4 + shadcn/ui + lucide-react** | Credible dashboard UI fast; accessible primitives. |
+| **Recharts** | Chart library for dashboard analytics (time-to-revenue, workflow success, license expiration, usage costs, enrollment velocity). |
 | **Zod** | Input validation on every Route Handler. |
 | **Bun test + Playwright** | Native Bun runner for unit/component, Playwright for e2e. |
 
@@ -60,11 +61,13 @@ components/
 └── dashboard/
     ├── workflow-timeline.tsx     # generic step renderer
     ├── status-badge.tsx, data-table.tsx, logout-button.tsx, workflow-heartbeat.tsx
+    ├── analytics/                # chart components (time-to-revenue, workflow-success, license-expiration, usage-cost, enrollment-velocity)
     └── billing/, compliance/, credentialing/, enrollment/, licensing/
 lib/
 ├── auth.ts                       # jose + bcryptjs + cookie helpers
 ├── db.ts                         # Prisma client singleton
 ├── workflow/                     # Vercel Workflow SDK functions + Prisma store/read
+├── analytics.ts                  # data aggregation functions for dashboard charts
 ├── billing.ts                    # PRICING, rollupUsage, usage/invoice queries
 ├── stripe-mock.ts                # Stripe-shaped invoice + meter-event primitives
 ├── compliance.ts, credentialing.ts, enrollment.ts, licenses.ts, providers.ts, workflows.ts

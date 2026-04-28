@@ -145,3 +145,15 @@ POST /api/auth/logout  → clearSessionCookie()
 - `providerQuerySchema` — `{ status?, specialty?, search? }`
 - `addPaymentMethodSchema` — `{ type, last4, expiryMonth, expiryYear, brand?, setDefault }`
 - `createSubscriptionSchema` — `{ plan: STARTUP | GROWTH | ENTERPRISE }`
+
+## Analytics
+
+`lib/analytics.ts` — data aggregation functions for dashboard charts:
+
+- `getTimeToRevenueData(orgId, days)` — Credentialing completion trends by month vs 60-day industry baseline
+- `getWorkflowSuccessRates(orgId)` — Status distribution across credentialing, licensing, enrollment, compliance workflows
+- `getLicenseExpirationData(orgId)` — Licenses grouped by expiration buckets (0-30, 30-60, 60-90, 90-180, 180+ days)
+- `getUsageCostData(orgId, days)` — Monthly costs by product line (credentialing, licensing, enrollment, monitoring)
+- `getEnrollmentVelocityData(orgId)` — Payer approval rates and average days-to-approval
+
+All functions use existing Prisma models with no schema changes required. Charts are rendered via Recharts in `components/dashboard/analytics/`.

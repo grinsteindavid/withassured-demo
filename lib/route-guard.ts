@@ -5,7 +5,7 @@ import { getSessionUser } from "@/lib/auth";
 import { requireActiveSubscription, subscriptionBlockedResponse } from "@/lib/subscription-guard";
 import { rateLimit, buildIdentifier, RateLimitUnavailableError } from "@/lib/rate-limit";
 
-const DEFAULT_RATE_LIMIT_MAX = 15;
+const DEFAULT_RATE_LIMIT_MAX = 60;
 const DEFAULT_RATE_LIMIT_WINDOW_MS = 60_000;
 
 export interface RateLimitOptions {
