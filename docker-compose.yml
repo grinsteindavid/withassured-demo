@@ -21,6 +21,7 @@ services:
       redis-server
       --maxmemory 30mb
       --maxmemory-policy allkeys-lru
+      --loglevel debug
     ports:
       - "6379:6379"
     healthcheck:
