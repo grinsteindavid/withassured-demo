@@ -177,3 +177,69 @@ export async function recomputeForWorkflow(workflowId: string) {
     // silently ignore
   }
 }
+
+async function getWorkflowEntityInfo(workflowId: string): Promise<{ orgId: string; entityType: string; entityId: string } | null> {
+  try {
+    if (workflowId.startsWith("cred_")) {
+      const providerId = workflowId.replace("cred_", "");
+      const provider = await prisma.provider.findUnique({ where: { id: providerId } });
+      if (!provider) return null;
+      return { orgId: provider.orgId, entityType: "credentialing", entityId: providerId };
+    }
+
+    if (workflowId.startsWith("lic_")) {
+      const licenses = await prisma.license.findMany({ where: { workflowId } });
+      if (!licenses.length) return null;
+      const license = licenses[0];
+      const provider = await prisma.provider.findUnique({ where: { id: license.providerId } });
+      if (!provider) return null;
+      return { orgId: provider.orgId, entityType: "license", entityId: license.id };
+    }
+
+    if (workflowId.startsWith("enr_")) {
+      const enrollments = await prisma.payerEnrollment.findMany({ where: { workflowId } });
+      if (!enrollments.length) return null;
+      const enrollment = enrollments[0];
+      const provider = await prisma.provider.findUnique({ where: { id: enrollment.providerId } });
+      if (!provider) return null;
+      return { orgId: provider.orgId, entityType: "enrollment", entityId: enrollment.id };
+    }
+
+    if (workflowId.startsWith("comp_")) {
+      const checkId = workflowId.replace("comp_", "");
+      const check = await prisma.complianceCheck.findUnique({ where: { id: checkId } });
+      if (!check) return null;
+      const provider = await prisma.provider.findUnique({ where: { id: check.providerId } });
+      if (!provider) return null;
+      return { orgId: provider.orgId, entityType: "compliance", entityId: checkId };
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export async function createAlert(
+  workflowId: string,
+  type: "WORKFLOW_COMPLETED" | "WORKFLOW_FAILED",
+  severity: "INFO" | "ERROR",
+  title: string,
+  message: string,
+) {
+  const entityInfo = await getWorkflowEntityInfo(workflowId);
+  if (!entityInfo) return;
+
+  await (prisma as any).alert.create({
+    data: {
+      orgId: entityInfo.orgId,
+      type,
+      severity,
+      title,
+      message,
+      workflowId,
+      entityType: entityInfo.entityType,
+      entityId: entityInfo.entityId,
+    },
+  });
+}

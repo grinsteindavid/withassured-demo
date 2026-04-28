@@ -76,6 +76,16 @@ enum SubscriptionStatus {
   TRIALING
 }
 
+enum AlertType {
+  WORKFLOW_COMPLETED
+  WORKFLOW_FAILED
+}
+
+enum AlertSeverity {
+  INFO
+  ERROR
+}
+
 model Organization {
   id               String           @id @default(cuid())
   name             String
@@ -86,6 +96,7 @@ model Organization {
   invoices         Invoice[]
   paymentMethods   PaymentMethod[]
   subscription     Subscription?
+  alerts           Alert[]
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 }
@@ -245,4 +256,22 @@ model Workflow {
   startedAt DateTime  @default(now())
   closedAt  DateTime?
   updatedAt DateTime  @updatedAt
+}
+
+model Alert {
+  id          String        @id @default(cuid())
+  orgId       String
+  type        AlertType
+  severity    AlertSeverity
+  title       String
+  message     String
+  workflowId  String
+  entityType  String
+  entityId    String
+  read        Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+  organization Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([workflowId])
 }

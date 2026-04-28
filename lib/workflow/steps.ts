@@ -5,6 +5,7 @@ import {
   failRun,
   markStepRunning,
   markStepCompleted,
+  createAlert,
 } from "./store";
 import type { WorkflowType } from "./types";
 
@@ -21,11 +22,39 @@ export async function ensureRunStep(workflowId: string, type: WorkflowType) {
 export async function completeRunStep(workflowId: string) {
   "use step";
   await completeRun(workflowId);
+  const workflowType = workflowId.startsWith("cred_")
+    ? "Credentialing"
+    : workflowId.startsWith("lic_")
+    ? "Licensing"
+    : workflowId.startsWith("enr_")
+    ? "Enrollment"
+    : "Compliance";
+  await createAlert(
+    workflowId,
+    "WORKFLOW_COMPLETED",
+    "INFO",
+    `${workflowType} workflow completed`,
+    `The ${workflowType.toLowerCase()} workflow has completed successfully.`,
+  );
 }
 
 export async function failRunStep(workflowId: string) {
   "use step";
   await failRun(workflowId);
+  const workflowType = workflowId.startsWith("cred_")
+    ? "Credentialing"
+    : workflowId.startsWith("lic_")
+    ? "Licensing"
+    : workflowId.startsWith("enr_")
+    ? "Enrollment"
+    : "Compliance";
+  await createAlert(
+    workflowId,
+    "WORKFLOW_FAILED",
+    "ERROR",
+    `${workflowType} workflow failed`,
+    `The ${workflowType.toLowerCase()} workflow has failed - please review the workflow details.`,
+  );
 }
 
 // Execute a single workflow step: mark it RUNNING, simulate 3–8s of work,

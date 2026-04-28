@@ -21,7 +21,7 @@ How the pieces fit together, the seams designed for production swap-in, and what
 
 - **Frontend + backend in one repo** via the Next.js App Router.
 - **Vercel Workflows** (`lib/workflow/`) run via Next.js API routes using the Vercel Workflow SDK (`'use workflow'` / `'use step'`). A cron job advances compliance checks. See `docs/workflows.md`.
-- **Postgres** stores providers, licenses, enrollments, compliance events, billing data, payment methods, subscriptions.
+- **Postgres** stores providers, licenses, enrollments, compliance events, billing data, payment methods, subscriptions, and alerts.
 - **Bootstrap hooks** in `app/layout.tsx` are minimal — no workflow side effects at module load.
 
 ## Tech stack
@@ -111,6 +111,17 @@ Workflows are database-backed using a Prisma `Workflow` table and the Vercel Wor
 2. **Execution** — steps are `'use step'` functions that write to the `Workflow` row (mark step as `RUNNING` → `COMPLETED`).
 3. **Compliance** — Vercel Cron (`0 1 * * *`) hits `GET /api/cron/compliance`, which creates new `ComplianceCheck` rows and starts compliance workflows.
 4. **Reads** — UI pages call `getWorkflowState()` which queries the `Workflow` table and derives `WorkflowStep[]` for `<WorkflowTimeline>`.
+5. **Alerts** — When workflows complete or fail, `completeRunStep` and `failRunStep` automatically create alerts via `createAlert()`. Alerts are stored in the `Alert` table and displayed in the dashboard inbox (`/dashboard/inbox`). Only Vercel workflow steps can run Prisma code, so alert creation happens in step functions.
+
+## Alert system
+
+The alert system notifies users of workflow completion and failures:
+
+- **Alert model** — Per-organization alerts with type (`WORKFLOW_COMPLETED`, `WORKFLOW_FAILED`), severity (`INFO`, `ERROR`), title, message, workflow ID, entity type (credentialing/license/enrollment/compliance), entity ID, read status, and timestamp.
+- **Creation** — Automatically triggered in `lib/workflow/steps.ts` when `completeRunStep` or `failRunStep` is called. The `createAlert()` function in `lib/workflow/store.ts` determines the organization and entity from the workflow ID.
+- **UI** — Dashboard sidebar shows inbox link with unread badge count. Inbox page at `/dashboard/inbox` displays alerts with filtering by severity, pagination, and "Mark all as read" functionality.
+- **API routes** — `GET /api/alerts` fetches alerts with pagination/filters, `PATCH /api/alerts` marks alerts as read, `GET /api/alerts/unread-count` returns unread count.
+- **Library functions** — `lib/alerts.ts` provides `getAlerts()`, `markAlertAsRead()`, `markAllAlertsAsRead()`, and `getUnreadCount()`.
 
 ## Productionization checklist
 
