@@ -66,7 +66,7 @@ Instead of a boot-time `setInterval`, compliance checks are driven by `vercel.js
 ```json
 {
   "crons": [
-    { "path": "/api/cron/compliance", "schedule": "*/5 * * * *" }
+    { "path": "/api/cron/compliance", "schedule": "0 1 * * *" }
   ]
 }
 ```
@@ -105,4 +105,4 @@ No mock state, no reconciliation at boot — the database is the source of truth
 
 - The `Workflow` table persists step-level state. `getWorkflowState()` is a pure read + derive.
 - The `start()` function from `workflow/api` kicks off Vercel Workflow execution. In local dev, `withWorkflow()` in `next.config.ts` handles discovery and execution.
-- Cron is free on Vercel Pro; the `*/5 * * * *` schedule keeps the compliance demo alive.
+- Cron is free on Vercel Pro; the `0 1 * * *` schedule runs compliance checks daily at 1am.

@@ -106,7 +106,7 @@ Workflows are database-backed using a Prisma `Workflow` table and the Vercel Wor
 
 1. **Creation** — business logic (`lib/providers.ts`, `lib/enrollment.ts`) calls `start(workflowFn, [workflowId])` when a provider/enrollment is created. The workflow function (`'use workflow'`) calls `ensureRun()` to create a `Workflow` row.
 2. **Execution** — steps are `'use step'` functions that write to the `Workflow` row (mark step as `RUNNING` → `COMPLETED`).
-3. **Compliance** — Vercel Cron (`*/5 * * * *`) hits `GET /api/cron/compliance`, which creates new `ComplianceCheck` rows and starts compliance workflows.
+3. **Compliance** — Vercel Cron (`0 1 * * *`) hits `GET /api/cron/compliance`, which creates new `ComplianceCheck` rows and starts compliance workflows.
 4. **Reads** — UI pages call `getWorkflowState()` which queries the `Workflow` table and derives `WorkflowStep[]` for `<WorkflowTimeline>`.
 
 ## Productionization checklist
