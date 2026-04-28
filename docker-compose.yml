@@ -44,6 +44,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+      start_period: 15s
     command: >
       sh -c "bunx prisma generate &&
              bunx prisma migrate deploy &&
