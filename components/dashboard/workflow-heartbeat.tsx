@@ -3,16 +3,20 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
-export function WorkflowHeartbeat() {
+interface WorkflowHeartbeatProps {
+  interval?: number;
+}
+
+export function WorkflowHeartbeat({ interval = 5000 }: WorkflowHeartbeatProps) {
   const router = useRouter();
 
   useEffect(() => {
-    const interval = setInterval(() => {
+    const intervalId = setInterval(() => {
       router.refresh();
-    }, 5000);
+    }, interval);
 
-    return () => clearInterval(interval);
-  }, [router]);
+    return () => clearInterval(intervalId);
+  }, [router, interval]);
 
   return null;
 }

@@ -29,7 +29,9 @@ export default async function CompliancePage({ searchParams }: CompliancePagePro
   const detail = selectedCheckId ? await getComplianceWorkflowDetail(selectedCheckId, user.orgId) : null;
 
   return (
-    <div>
+    <>
+      <WorkflowHeartbeat interval={10000} />
+      <div>
       <h1 className="mb-6 text-2xl font-bold">Compliance Monitoring</h1>
 
       <div className="grid grid-cols-12 gap-6">
@@ -79,7 +81,6 @@ export default async function CompliancePage({ searchParams }: CompliancePagePro
           <section className="col-span-12 md:col-span-7 lg:col-span-8">
             {detail ? (
               <div data-testid="compliance-detail">
-                <WorkflowHeartbeat />
                 <div className="mb-4 flex items-start justify-between gap-4">
                   <div>
                     <h2 className="text-lg font-semibold">{detail.providerName}</h2>
@@ -106,5 +107,6 @@ export default async function CompliancePage({ searchParams }: CompliancePagePro
         )}
       </div>
     </div>
+    </>
   );
 }
