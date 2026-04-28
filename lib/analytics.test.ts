@@ -35,7 +35,6 @@ import {
   getWorkflowSuccessRates,
   getLicenseExpirationData,
   getUsageCostData,
-  getEnrollmentVelocityData,
 } from "./analytics";
 
 describe("analytics", () => {
@@ -143,35 +142,12 @@ describe("analytics", () => {
 
       const result = await getUsageCostData(orgId, 30);
       expect(result).toBeArray();
+      expect(result.length).toBeGreaterThan(0);
+      expect(result[0].credentialing).toBe(0);
+      expect(result[0].licensing).toBe(0);
+      expect(result[0].enrollment).toBe(0);
+      expect(result[0].monitoring).toBe(0);
     });
   });
 
-  describe("getEnrollmentVelocityData", () => {
-    it("returns empty array when no enrollments exist", async () => {
-      findManyMock.mockResolvedValueOnce([]);
-      const result = await getEnrollmentVelocityData(orgId);
-      expect(result).toEqual([]);
-    });
-
-    it("calculates approval rate and days to approval", async () => {
-      const submittedAt = new Date("2026-01-01");
-      const approvedAt = new Date("2026-01-15");
-
-      findManyMock.mockResolvedValueOnce([
-        {
-          payer: "Medicare",
-          status: "APPROVED",
-          submittedAt,
-          updatedAt: approvedAt,
-        },
-      ]);
-
-      const result = await getEnrollmentVelocityData(orgId);
-      expect(result).toBeArray();
-      expect(result.length).toBe(1);
-      expect(result[0].payer).toBe("Medicare");
-      expect(result[0].approvalRate).toBe(100);
-      expect(result[0].avgDaysToApproval).toBe(14);
-    });
-  });
 });

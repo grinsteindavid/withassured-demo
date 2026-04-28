@@ -2,14 +2,12 @@ import { TimeToRevenueChart } from "./time-to-revenue-chart";
 import { WorkflowSuccessChart } from "./workflow-success-chart";
 import { LicenseExpirationChart } from "./license-expiration-chart";
 import { UsageCostChart } from "./usage-cost-chart";
-import { EnrollmentVelocityChart } from "./enrollment-velocity-chart";
 import { DateRangeSelector } from "./date-range-selector";
 import {
   getTimeToRevenueData,
   getWorkflowSuccessRates,
   getLicenseExpirationData,
   getUsageCostData,
-  getEnrollmentVelocityData,
 } from "@/lib/analytics";
 
 interface AnalyticsSectionProps {
@@ -18,13 +16,12 @@ interface AnalyticsSectionProps {
 }
 
 export async function AnalyticsSection({ orgId, days }: AnalyticsSectionProps) {
-  const [timeToRevenueData, workflowSuccessData, licenseExpirationData, usageCostData, enrollmentVelocityData] =
+  const [timeToRevenueData, workflowSuccessData, licenseExpirationData, usageCostData] =
     await Promise.all([
       getTimeToRevenueData(orgId, days),
       getWorkflowSuccessRates(orgId),
       getLicenseExpirationData(orgId),
       getUsageCostData(orgId, days),
-      getEnrollmentVelocityData(orgId),
     ]);
 
   return (
@@ -55,10 +52,6 @@ export async function AnalyticsSection({ orgId, days }: AnalyticsSectionProps) {
           <UsageCostChart data={usageCostData} />
         </div>
 
-        <div className="rounded border p-4 lg:col-span-2">
-          <h3 className="mb-4 text-sm font-medium text-gray-500">Payer Enrollment Approval Velocity</h3>
-          <EnrollmentVelocityChart data={enrollmentVelocityData} />
-        </div>
       </div>
     </div>
   );

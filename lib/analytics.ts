@@ -26,12 +26,6 @@ export interface UsageCostDataPoint {
   monitoring: number;
 }
 
-export interface EnrollmentVelocityData {
-  payer: string;
-  approvalRate: number;
-  avgDaysToApproval: number;
-}
-
 export async function getTimeToRevenueData(orgId: string, days: number): Promise<TimeToRevenueDataPoint[]> {
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - days);
@@ -214,45 +208,3 @@ export async function getUsageCostData(orgId: string, days: number): Promise<Usa
   return result;
 }
 
-export async function getEnrollmentVelocityData(orgId: string): Promise<EnrollmentVelocityData[]> {
-  const enrollments = await prisma.payerEnrollment.findMany({
-    where: {
-      provider: { orgId },
-      status: { in: ["APPROVED", "DENIED"] },
-      submittedAt: { not: null },
-    },
-    select: {
-      payer: true,
-      status: true,
-      submittedAt: true,
-      updatedAt: true,
-    },
-  });
-
-  // Group by payer
-  const payerData = new Map<string, { approved: number; denied: number; totalDays: number; count: number }>();
-  enrollments.forEach((e) => {
-    if (!e.submittedAt) return;
-    const daysToApproval = Math.floor((e.updatedAt.getTime() - e.submittedAt.getTime()) / (1000 * 60 * 60 * 24));
-    const current = payerData.get(e.payer) || { approved: 0, denied: 0, totalDays: 0, count: 0 };
-    current.count++;
-    current.totalDays += daysToApproval;
-    if (e.status === "APPROVED") {
-      current.approved++;
-    } else {
-      current.denied++;
-    }
-    payerData.set(e.payer, current);
-  });
-
-  const result: EnrollmentVelocityData[] = Array.from(payerData.entries())
-    .map(([payer, data]) => ({
-      payer,
-      approvalRate: data.count > 0 ? (data.approved / data.count) * 100 : 0,
-      avgDaysToApproval: data.count > 0 ? data.totalDays / data.count : 0,
-    }))
-    .sort((a, b) => b.approvalRate - a.approvalRate)
-    .slice(0, 10); // Top 10 payers
-
-  return result;
-}
