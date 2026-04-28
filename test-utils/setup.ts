@@ -13,6 +13,17 @@ import { afterEach, expect, mock } from "bun:test";
 // build time; this mock only affects `bun test`.
 mock.module("server-only", () => ({}));
 
+// Stub the Redis client so suites that import middleware / route guards /
+// rate-limit code don't open a TCP socket (and don't trip the network
+// blocker). Individual tests can still override `@/lib/redis` in their
+// own scope to assert specific Redis behaviour.
+mock.module("@/lib/redis", () => ({
+  redis: {
+    incr: async () => 1,
+    pexpire: async () => 1,
+  },
+}));
+
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
 import * as matchers from "@testing-library/jest-dom/matchers";
 import { blockNetwork } from "./network-blocker";

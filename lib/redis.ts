@@ -18,18 +18,33 @@ declare global {
   var __assuredRedis: Redis | undefined;
 }
 
-// `lazyConnect: true` — defer the TCP connect until the first command, so
-//   importing this module never opens a socket.
-// `maxRetriesPerRequest: 1` — fail fast so the rate limiter's fail-closed
-//   path returns 503 promptly when Redis is down.
-// `enableOfflineQueue: false` — when disconnected, commands reject
-//   immediately instead of being queued.
+// Tuned for serverless (Vercel lambdas) where the TCP socket may be
+// closed between warm invocations and the first command races the TLS+AUTH
+// handshake on cold starts. The defaults below absorb both without flipping
+// the limiter to fail-open.
+//
+// - eager connect (no `lazyConnect`) so the handshake overlaps module init
+//   instead of the first `incr` call.
+// - `maxRetriesPerRequest: 3` tolerates a single dropped packet on cold
+//   start without surfacing as a 5xx.
+// - `connectTimeout: 10_000` caps a stuck handshake so a lambda can't hang.
+// - `enableReadyCheck` defers commands until the client emits "ready".
+// - `enableOfflineQueue` (default true) queues commands during the brief
+//   window between connect() and ready.
+// - `retryStrategy` reconnects with mild backoff (50ms..500ms).
+// - `reconnectOnError` forces a fresh socket when the edge silently closes
+//   the previous one (`Stream isn't writeable`) or the replica flips read-only.
 export const redis: Redis =
   globalThis.__assuredRedis ??
   new Redis(url, {
-    lazyConnect: true,
-    maxRetriesPerRequest: 1,
-    enableOfflineQueue: false,
+    maxRetriesPerRequest: 3,
+    connectTimeout: 10_000,
+    enableReadyCheck: true,
+    retryStrategy: (times) => Math.min(times * 50, 500),
+    reconnectOnError: (err) => {
+      const msg = err.message;
+      return msg.includes("READONLY") || msg.includes("Stream isn't writeable");
+    },
   });
 
 if (process.env.NODE_ENV !== "production") {

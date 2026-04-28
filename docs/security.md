@@ -21,13 +21,17 @@ CSRF validation runs automatically on all `POST`/`PUT`/`PATCH`/`DELETE` handlers
 
 ## Rate limiting
 
-`lib/rate-limit.ts` provides a fixed-window rate limiter backed by Redis (Bun's native `RedisClient`, configured via `REDIS_URL`). The shared client lives in `lib/redis.ts`.
+`lib/rate-limit.ts` provides a fixed-window rate limiter backed by Redis (`ioredis`, configured via `REDIS_URL`). The shared client lives in `lib/redis.ts`.
 
 - **Identifier**: prefers `user.id` (when authenticated); falls back to the `x-forwarded-for` IP. Build via `buildIdentifier({ bucket, userId, ip })`.
 - **Algorithm**: `INCR rl:{identifier}:{windowIndex}` + `PEXPIRE` on first hit. Counter naturally resets per window.
 - **Fail closed**: if Redis is unreachable, the limiter throws `RateLimitUnavailableError` and callers respond with `503`. Rate limiting does not work without Redis.
+- **Serverless tolerance**: the `ioredis` client in `lib/redis.ts` allows up to 3 retries per request, force-reconnects on dropped sockets, and uses an eager-connect + ready-check handshake to absorb cold-start TLS races on Vercel lambdas without flipping fail-closed behaviour.
 - **Auth endpoints** (`/api/auth/login`): `15 req/min` per IP (bucket `login`).
-- **Authenticated API routes**: opt-in per route via `withAuth(handler, { rateLimit: { bucket, max?, windowMs? } })`. Defaults: `100 req/min`.
+- **All authenticated API routes**: `15 req/min` per `user.id` (bucket `api`) — applied automatically by `withAuth` / `withAuthParams`. Override per route with `withAuth(handler, { rateLimit: { bucket, max?, windowMs? } })`.
+- **Dashboard pages**: `15 renders/min` per `user.id` via `enforcePageRateLimit({ bucket: "dashboard" })` in `app/dashboard/layout.tsx` (`lib/rate-limit-guard.ts`). Add the same call to other layouts to extend coverage.
+
+> Rate-limiting cannot live in `middleware.ts` (proxy in Next 16) because middleware is bundled separately and Node-only deps like `ioredis` cannot be externalized for that bundle.
 
 ## Security headers
 

@@ -5,7 +5,7 @@ import { getSessionUser } from "@/lib/auth";
 import { requireActiveSubscription, subscriptionBlockedResponse } from "@/lib/subscription-guard";
 import { rateLimit, buildIdentifier, RateLimitUnavailableError } from "@/lib/rate-limit";
 
-const DEFAULT_RATE_LIMIT_MAX = 100;
+const DEFAULT_RATE_LIMIT_MAX = 15;
 const DEFAULT_RATE_LIMIT_WINDOW_MS = 60_000;
 
 export interface RateLimitOptions {
@@ -98,10 +98,8 @@ export function withAuth(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (options?.rateLimit) {
-      const limited = await enforceRateLimit(request, options.rateLimit, user);
-      if (limited) return limited;
-    }
+    const limited = await enforceRateLimit(request, options?.rateLimit ?? { bucket: "api" }, user);
+    if (limited) return limited;
 
     return handler(request, user);
   };
@@ -166,10 +164,8 @@ export function withAuthParams(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (options?.rateLimit) {
-      const limited = await enforceRateLimit(request, options.rateLimit, user);
-      if (limited) return limited;
-    }
+    const limited = await enforceRateLimit(request, options?.rateLimit ?? { bucket: "api" }, user);
+    if (limited) return limited;
 
     return handler(request, params, user);
   };

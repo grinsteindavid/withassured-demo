@@ -51,6 +51,7 @@ services:
       - "3000:3000"
     volumes:
       - .:/app
+      - /app/node_modules
       - /app/.next
     depends_on:
       db:
@@ -58,7 +59,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:3000/ || exit 1"]
+      test: ["CMD-SHELL", "curl -f -H \"Authorization: Bearer $$CRON_SECRET\" http://localhost:3000/api/health || exit 1"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -78,6 +79,12 @@ services:
     depends_on:
       app:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f -H \"Authorization: Bearer $$CRON_SECRET\" $$APP_URL/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     command: >
       sh -c "while true; do
         echo \"=== \$(date -Iseconds) - Starting compliance check ===\";

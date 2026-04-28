@@ -1,7 +1,13 @@
 import { ReactNode } from "react";
 import { LogoutButton } from "@/components/dashboard/logout-button";
+import { enforcePageRateLimit } from "@/lib/rate-limit-guard";
 
-export default function DashboardLayout({ children }: { children: ReactNode }) {
+export default async function DashboardLayout({ children }: { children: ReactNode }) {
+  // Throttle dashboard navigation to 15 renders/min per user (or per IP
+  // when unauthenticated). Throws RateLimitExceededError → 500 page when
+  // exceeded, RateLimitUnavailableError → 500 when Redis is down.
+  await enforcePageRateLimit({ bucket: "dashboard" });
+
   return (
     <div className="flex min-h-screen">
       <aside className="flex w-64 flex-col border-r p-4">
