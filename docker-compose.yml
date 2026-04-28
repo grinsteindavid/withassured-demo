@@ -22,7 +22,7 @@ services:
     environment:
       NODE_ENV: development
       DATABASE_URL: postgresql://postgres:postgres@db:5432/assured
-      JWT_SECRET: ${JWT_SECRET:-development-secret-32-bytes-minimum-change-in-production}
+      JWT_SECRET: ${JWT_SECRET}
 
       HOSTNAME: "0.0.0.0"
       # macOS bind mounts don't fire inotify events — force polling so
