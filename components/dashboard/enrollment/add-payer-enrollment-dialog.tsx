@@ -14,6 +14,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import type { Subscription } from "@/lib/stripe-mock";
+import { apiFetch } from "@/lib/api-client";
 
 interface ProviderOption {
   id: string;
@@ -55,7 +56,7 @@ export function AddPayerEnrollmentDialog({
     }
 
     try {
-      const res = await fetch("/api/enrollments", {
+      const res = await apiFetch("/api/enrollments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

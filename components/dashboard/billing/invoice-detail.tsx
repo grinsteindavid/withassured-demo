@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { StatusBadge } from "@/components/dashboard/status-badge";
 import { useRouter } from "next/navigation";
 import { formatDate } from "@/lib/format";
+import { apiFetch } from "@/lib/api-client";
 
 export function InvoiceDetail({
   invoice,
@@ -36,7 +37,7 @@ export function InvoiceDetail({
     setPaySuccess(false);
 
     try {
-      const res = await fetch(`/api/billing/invoices/${invoice.id}/pay-with-method`, {
+      const res = await apiFetch(`/api/billing/invoices/${invoice.id}/pay-with-method`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ paymentMethodId: selectedPaymentMethod }),

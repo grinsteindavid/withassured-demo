@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { SUBSCRIPTION_PRICING } from "@/lib/subscription-plans";
 import { useRouter } from "next/navigation";
+import { apiFetch } from "@/lib/api-client";
 
 export function PlanSelector({ currentPlan, onClose }: { currentPlan: string | null; onClose: () => void }) {
   const router = useRouter();
@@ -21,7 +22,7 @@ export function PlanSelector({ currentPlan, onClose }: { currentPlan: string | n
   const handleSubscribe = async (plan: string) => {
     setLoading(true);
     try {
-      const res = await fetch("/api/payments/subscription", {
+      const res = await apiFetch("/api/payments/subscription", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ plan }),

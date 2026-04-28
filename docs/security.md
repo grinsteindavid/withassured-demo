@@ -19,6 +19,8 @@ All API routes use wrappers from `lib/route-guard.ts`:
 
 CSRF validation runs automatically on all `POST`/`PUT`/`PATCH`/`DELETE` handlers. Pass `{ csrf: false }` to disable.
 
+Double-submit cookie pattern: `setCsrfCookie()` writes a non-httpOnly `csrf-token` cookie on login; the guard matches it against the `x-csrf-token` request header. Client components **must** call mutating endpoints through `apiFetch` (`lib/api-client.ts`) — it reads the cookie and forwards the header automatically. Plain `fetch` on a POST/PUT/PATCH/DELETE will return `403 Invalid or missing CSRF token`.
+
 ## Rate limiting
 
 `lib/rate-limit.ts` provides a fixed-window rate limiter backed by Redis (`ioredis`, configured via `REDIS_URL`). The shared client lives in `lib/redis.ts`.

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useRouter } from "next/navigation";
+import { apiFetch } from "@/lib/api-client";
 
 export function AddPaymentMethod() {
   const router = useRouter();
@@ -22,7 +23,7 @@ export function AddPaymentMethod() {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/payments/methods", {
+      const res = await apiFetch("/api/payments/methods", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),

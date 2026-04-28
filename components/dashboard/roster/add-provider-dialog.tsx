@@ -14,6 +14,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import type { Subscription } from "@/lib/stripe-mock";
+import { apiFetch } from "@/lib/api-client";
 
 export function AddProviderDialog({ subscription }: { subscription?: Subscription | null }) {
   const router = useRouter();
@@ -36,7 +37,7 @@ export function AddProviderDialog({ subscription }: { subscription?: Subscriptio
     setError(null);
 
     try {
-      const res = await fetch("/api/providers", {
+      const res = await apiFetch("/api/providers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),

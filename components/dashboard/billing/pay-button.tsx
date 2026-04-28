@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { apiFetch } from "@/lib/api-client";
 
 interface PayButtonProps {
   invoiceId: string;
@@ -14,7 +15,7 @@ export function PayButton({ invoiceId }: PayButtonProps) {
   async function handlePay() {
     setLoading(true);
     try {
-      const res = await fetch(`/api/billing/invoices/${invoiceId}/pay`, {
+      const res = await apiFetch(`/api/billing/invoices/${invoiceId}/pay`, {
         method: "POST",
       });
       if (res.ok) {

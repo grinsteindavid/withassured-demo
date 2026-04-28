@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { PlanSelector } from "./plan-selector";
 import { formatDate } from "@/lib/format";
 import type { Subscription } from "@/lib/stripe-mock";
+import { apiFetch } from "@/lib/api-client";
 
 export function SubscriptionCard({
   subscription,
@@ -21,7 +22,7 @@ export function SubscriptionCard({
   const handleCancel = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/payments/subscription/cancel", {
+      const res = await apiFetch("/api/payments/subscription/cancel", {
         method: "POST",
       });
       if (res.ok) {

@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type { PaymentMethodDetails } from "@/lib/stripe-mock";
+import { apiFetch } from "@/lib/api-client";
 
 export function PaymentMethods({
   methods,
@@ -18,7 +19,7 @@ export function PaymentMethods({
   const handleSetDefault = async (dbId: string) => {
     setLoading(dbId);
     try {
-      const res = await fetch(`/api/payments/methods/${dbId}/default`, {
+      const res = await apiFetch(`/api/payments/methods/${dbId}/default`, {
         method: "POST",
       });
       if (res.ok) {
@@ -34,7 +35,7 @@ export function PaymentMethods({
   const handleRemove = async (dbId: string) => {
     setLoading(dbId);
     try {
-      const res = await fetch(`/api/payments/methods/${dbId}`, {
+      const res = await apiFetch(`/api/payments/methods/${dbId}`, {
         method: "DELETE",
       });
       if (res.ok) {
