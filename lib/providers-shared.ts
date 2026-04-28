@@ -45,31 +45,25 @@ export type ProviderDetail = ProviderSummary & {
 export function computeProviderStatus(
   provider: Pick<
     ProviderWithRelations,
-    "licenses" | "enrollments" | "complianceChecks"
+    "licenses" | "complianceChecks"
   >,
 ): ProviderStatus {
   const hasExpiredOrRevokedLicense = provider.licenses.some(
     (l) => l.status === "EXPIRED" || l.status === "REVOKED",
   );
-  const hasDeniedEnrollment = provider.enrollments.some(
-    (e) => e.status === "DENIED",
-  );
   const hasComplianceFlag = provider.complianceChecks.some(
     (c) => c.result === "FLAG",
   );
 
-  if (hasExpiredOrRevokedLicense || hasDeniedEnrollment || hasComplianceFlag) {
+  if (hasExpiredOrRevokedLicense || hasComplianceFlag) {
     return "INACTIVE";
   }
 
   const hasPendingLicense = provider.licenses.some(
     (l) => l.status === "PENDING",
   );
-  const hasPendingEnrollment = provider.enrollments.some(
-    (e) => e.status === "PENDING" || e.status === "SUBMITTED",
-  );
 
-  if (hasPendingLicense || hasPendingEnrollment) {
+  if (hasPendingLicense) {
     return "PENDING";
   }
 

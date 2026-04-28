@@ -230,7 +230,6 @@ describe("computeProviderStatus", () => {
   it("returns INACTIVE when license is EXPIRED", () => {
     const status = computeProviderStatus({
       licenses: [{ status: "EXPIRED" }] as never,
-      enrollments: [],
       complianceChecks: [],
     });
     expect(status).toBe("INACTIVE");
@@ -239,16 +238,6 @@ describe("computeProviderStatus", () => {
   it("returns INACTIVE when license is REVOKED", () => {
     const status = computeProviderStatus({
       licenses: [{ status: "REVOKED" }] as never,
-      enrollments: [],
-      complianceChecks: [],
-    });
-    expect(status).toBe("INACTIVE");
-  });
-
-  it("returns INACTIVE when enrollment is DENIED", () => {
-    const status = computeProviderStatus({
-      licenses: [],
-      enrollments: [{ status: "DENIED" }] as never,
       complianceChecks: [],
     });
     expect(status).toBe("INACTIVE");
@@ -257,7 +246,6 @@ describe("computeProviderStatus", () => {
   it("returns INACTIVE when compliance check is FLAG", () => {
     const status = computeProviderStatus({
       licenses: [],
-      enrollments: [],
       complianceChecks: [{ result: "FLAG" }] as never,
     });
     expect(status).toBe("INACTIVE");
@@ -266,25 +254,6 @@ describe("computeProviderStatus", () => {
   it("returns PENDING when license is PENDING", () => {
     const status = computeProviderStatus({
       licenses: [{ status: "PENDING" }] as never,
-      enrollments: [],
-      complianceChecks: [],
-    });
-    expect(status).toBe("PENDING");
-  });
-
-  it("returns PENDING when enrollment is SUBMITTED", () => {
-    const status = computeProviderStatus({
-      licenses: [],
-      enrollments: [{ status: "SUBMITTED" }] as never,
-      complianceChecks: [],
-    });
-    expect(status).toBe("PENDING");
-  });
-
-  it("returns PENDING when enrollment is PENDING", () => {
-    const status = computeProviderStatus({
-      licenses: [],
-      enrollments: [{ status: "PENDING" }] as never,
       complianceChecks: [],
     });
     expect(status).toBe("PENDING");
@@ -293,7 +262,6 @@ describe("computeProviderStatus", () => {
   it("returns ACTIVE when all clean", () => {
     const status = computeProviderStatus({
       licenses: [{ status: "ACTIVE" }] as never,
-      enrollments: [{ status: "APPROVED" }] as never,
       complianceChecks: [{ result: "CLEAN" }] as never,
     });
     expect(status).toBe("ACTIVE");
