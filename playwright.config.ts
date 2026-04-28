@@ -13,7 +13,7 @@ export default defineConfig({
   reporter: process.env.CI ? "github" : "list",
   globalSetup: "./e2e/globalSetup.ts",
   use: {
-    baseURL: "http://localhost:3000",
+    baseURL: process.env.BASE_URL || "http://localhost:3000",
     storageState: "playwright/.auth/admin.json",
     trace: "on-first-retry",
   },
@@ -22,11 +22,5 @@ export default defineConfig({
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
     },
-  ],
-  webServer: {
-    command: "bun dev",
-    url: "http://localhost:3000/login",
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
-  },
+  ]
 });
