@@ -1,8 +1,26 @@
 import { NextResponse } from "next/server";
-import { authenticateUser, signJWT, setSessionCookie } from "@/lib/auth";
+import { authenticateUser, signJWT, setSessionCookie, setCsrfCookie } from "@/lib/auth";
 import { loginSchema } from "@/lib/validators";
+import { rateLimit, buildIdentifier, RateLimitUnavailableError } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
+  const clientIp = request.headers.get("x-forwarded-for") ?? "unknown";
+  try {
+    const limitResult = await rateLimit(
+      buildIdentifier({ bucket: "login", ip: clientIp }),
+      15,
+      60_000,
+    );
+    if (!limitResult.allowed) {
+      return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
+    }
+  } catch (err) {
+    if (err instanceof RateLimitUnavailableError) {
+      return NextResponse.json({ error: "Rate limiter unavailable" }, { status: 503 });
+    }
+    throw err;
+  }
+
   const body = await request.json();
   const result = loginSchema.safeParse(body);
 
@@ -20,6 +38,7 @@ export async function POST(request: Request) {
 
   const token = await signJWT({ sub: user.id, orgId: user.orgId, role: user.role });
   await setSessionCookie(token);
+  await setCsrfCookie();
 
   return NextResponse.json({ user: { id: user.id, email: user.email, role: user.role } });
 }

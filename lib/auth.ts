@@ -78,3 +78,39 @@ export async function getSessionUser(): Promise<{ userId: string; orgId: string;
 
   return { userId: payload.sub, orgId: payload.orgId, role: payload.role };
 }
+
+export async function setCsrfCookie(): Promise<string> {
+  const token = crypto.randomUUID();
+  const cookieStore = await cookies();
+  cookieStore.set("csrf-token", token, {
+    httpOnly: false,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60,
+  });
+  return token;
+}
+
+export async function clearCsrfCookie(): Promise<void> {
+  const cookieStore = await cookies();
+  cookieStore.delete("csrf-token");
+}
+
+export async function requireAuth(): Promise<{ userId: string; orgId: string; role: string }> {
+  const user = await getSessionUser();
+  if (!user) {
+    throw new Error("UNAUTHORIZED");
+  }
+  return user;
+}
+
+export async function requireRole(
+  allowedRoles: string[],
+): Promise<{ userId: string; orgId: string; role: string }> {
+  const user = await requireAuth();
+  if (!allowedRoles.includes(user.role)) {
+    throw new Error("FORBIDDEN");
+  }
+  return user;
+}

@@ -1,6 +1,5 @@
 import { listLicenses, getLicenseDetail } from "@/lib/licenses";
 import { getSessionUser } from "@/lib/auth";
-import { redirect } from "next/navigation";
 import { WorkflowTimeline } from "@/components/dashboard/workflow-timeline";
 import { StatusBadge } from "@/components/dashboard/status-badge";
 import { formatDate } from "@/lib/format";
@@ -15,18 +14,14 @@ interface LicensingPageProps {
 export default async function LicensingPage({ searchParams }: LicensingPageProps) {
   const user = await getSessionUser();
 
-  if (!user) {
-    redirect("/login");
-  }
-
   const { license: selectedLicenseId, status, state, expiringInDays } = await searchParams;
   const filters = {
     status: status as LicenseStatus | undefined,
     state,
     expiringInDays: expiringInDays ? parseInt(expiringInDays, 10) : undefined,
   };
-  const licenses = await listLicenses(user.orgId, filters);
-  const detail = selectedLicenseId ? await getLicenseDetail(selectedLicenseId, user.orgId) : null;
+  const licenses = await listLicenses(user!.orgId, filters);
+  const detail = selectedLicenseId ? await getLicenseDetail(selectedLicenseId, user!.orgId) : null;
 
   return (
     <div>

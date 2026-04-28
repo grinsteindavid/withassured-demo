@@ -1,6 +1,5 @@
 import { listComplianceWorkflows, getComplianceWorkflowDetail, getProvidersByOrg } from "@/lib/compliance";
 import { getSessionUser } from "@/lib/auth";
-import { redirect } from "next/navigation";
 import { WorkflowTimeline } from "@/components/dashboard/workflow-timeline";
 import { StatusBadge } from "@/components/dashboard/status-badge";
 import { formatDate } from "@/lib/format";
@@ -14,19 +13,15 @@ interface CompliancePageProps {
 export default async function CompliancePage({ searchParams }: CompliancePageProps) {
   const user = await getSessionUser();
 
-  if (!user) {
-    redirect("/login");
-  }
-
   const { check: selectedCheckId, result, source, providerId } = await searchParams;
-  const providers = await getProvidersByOrg(user.orgId);
+  const providers = await getProvidersByOrg(user!.orgId);
   const filters = {
     result,
     source,
     providerId,
   };
-  const workflows = await listComplianceWorkflows(user.orgId, filters);
-  const detail = selectedCheckId ? await getComplianceWorkflowDetail(selectedCheckId, user.orgId) : null;
+  const workflows = await listComplianceWorkflows(user!.orgId, filters);
+  const detail = selectedCheckId ? await getComplianceWorkflowDetail(selectedCheckId, user!.orgId) : null;
 
   return (
     <>

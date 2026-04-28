@@ -1,5 +1,4 @@
 import { getSessionUser } from "@/lib/auth";
-import { redirect } from "next/navigation";
 import { listProviders, getProviderDetail } from "@/lib/providers";
 import { getSubscription } from "@/lib/payments";
 import { ProviderFilters } from "@/components/dashboard/roster/provider-filters";
@@ -15,19 +14,15 @@ interface RosterPageProps {
 export default async function RosterPage({ searchParams }: RosterPageProps) {
   const user = await getSessionUser();
 
-  if (!user) {
-    redirect("/login");
-  }
-
   const { provider: selectedProviderId, status, specialty, search } = await searchParams;
   const filters = {
     status: status as "ACTIVE" | "INACTIVE" | "PENDING" | undefined,
     specialty,
     search,
   };
-  const providers = await listProviders(user.orgId, filters);
-  const detail = selectedProviderId ? await getProviderDetail(selectedProviderId, user.orgId) : null;
-  const subscription = await getSubscription(user.orgId);
+  const providers = await listProviders(user!.orgId, filters);
+  const detail = selectedProviderId ? await getProviderDetail(selectedProviderId, user!.orgId) : null;
+  const subscription = await getSubscription(user!.orgId);
 
   return (
     <div>

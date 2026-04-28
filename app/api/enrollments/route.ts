@@ -1,35 +1,14 @@
 import { NextResponse } from "next/server";
 import { listPayerEnrollments, createPayerEnrollment } from "@/lib/enrollment";
-import { getSessionUser } from "@/lib/auth";
-import { requireActiveSubscription, subscriptionBlockedResponse } from "@/lib/subscription-guard";
+import { withSubscription } from "@/lib/route-guard";
 import { createPayerEnrollmentSchema } from "@/lib/validators";
 
-export async function GET() {
-  const user = await getSessionUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const hasSubscription = await requireActiveSubscription(user.orgId);
-  if (!hasSubscription) {
-    return subscriptionBlockedResponse();
-  }
-
+export const GET = withSubscription(async (_request, user) => {
   const enrollments = await listPayerEnrollments(user.orgId);
   return NextResponse.json(enrollments);
-}
+});
 
-export async function POST(request: Request) {
-  const user = await getSessionUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const hasSubscription = await requireActiveSubscription(user.orgId);
-  if (!hasSubscription) {
-    return subscriptionBlockedResponse();
-  }
-
+export const POST = withSubscription(async (request, user) => {
   const body = await request.json();
   const result = createPayerEnrollmentSchema.safeParse(body);
   if (!result.success) {
@@ -43,4 +22,4 @@ export async function POST(request: Request) {
     const message = err instanceof Error ? err.message : "Failed to create enrollment";
     return NextResponse.json({ error: message }, { status: 500 });
   }
-}
+});

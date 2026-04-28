@@ -1,23 +1,17 @@
 import { NextResponse } from "next/server";
 import { setDefaultPaymentMethod } from "@/lib/payments";
-import { getSessionUser } from "@/lib/auth";
+import { withRoleParams } from "@/lib/route-guard";
 
-export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getSessionUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+export const POST = withRoleParams(
+  async (_request, params, user) => {
+    const id = (await params).id as string;
+    const success = await setDefaultPaymentMethod(user.orgId, id);
 
-  if (user.role !== "ADMIN") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+    if (!success) {
+      return NextResponse.json({ error: "Payment method not found" }, { status: 404 });
+    }
 
-  const { id } = await params;
-  const success = await setDefaultPaymentMethod(user.orgId, id);
-
-  if (!success) {
-    return NextResponse.json({ error: "Payment method not found" }, { status: 404 });
-  }
-
-  return NextResponse.json({ success: true });
-}
+    return NextResponse.json({ success: true });
+  },
+  ["ADMIN"],
+);

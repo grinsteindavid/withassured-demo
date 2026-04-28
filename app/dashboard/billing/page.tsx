@@ -6,20 +6,15 @@ import { SubscriptionCard } from "@/components/dashboard/billing/subscription-ca
 import { getCurrentUsage, listAllInvoices } from "@/lib/billing";
 import { listPaymentMethods, getSubscription } from "@/lib/payments";
 import { getSessionUser } from "@/lib/auth";
-import { redirect } from "next/navigation";
 
 export default async function BillingPage() {
   const user = await getSessionUser();
 
-  if (!user) {
-    redirect("/login");
-  }
-
   const [usage, invoices, paymentMethods, subscription] = await Promise.all([
-    getCurrentUsage("current", user.orgId).catch(() => null),
-    listAllInvoices(user.orgId).catch(() => [] as Awaited<ReturnType<typeof listAllInvoices>>),
-    listPaymentMethods(user.orgId).catch(() => []),
-    getSubscription(user.orgId).catch(() => null),
+    getCurrentUsage("current", user!.orgId).catch(() => null),
+    listAllInvoices(user!.orgId).catch(() => [] as Awaited<ReturnType<typeof listAllInvoices>>),
+    listPaymentMethods(user!.orgId).catch(() => []),
+    getSubscription(user!.orgId).catch(() => null),
   ]);
 
   const openInvoice = invoices.find(

@@ -1,6 +1,5 @@
 import { listCredentialingCases, getCredentialingCaseDetail } from "@/lib/credentialing";
 import { getSessionUser } from "@/lib/auth";
-import { redirect } from "next/navigation";
 import { WorkflowTimeline } from "@/components/dashboard/workflow-timeline";
 import { StatusBadge } from "@/components/dashboard/status-badge";
 import { WorkflowHeartbeat } from "@/components/dashboard/workflow-heartbeat";
@@ -13,13 +12,9 @@ interface CredentialingPageProps {
 export default async function CredentialingPage({ searchParams }: CredentialingPageProps) {
   const user = await getSessionUser();
 
-  if (!user) {
-    redirect("/login");
-  }
-
   const { provider: selectedProviderId } = await searchParams;
-  const cases = await listCredentialingCases(user.orgId);
-  const detail = selectedProviderId ? await getCredentialingCaseDetail(selectedProviderId, user.orgId) : null;
+  const cases = await listCredentialingCases(user!.orgId);
+  const detail = selectedProviderId ? await getCredentialingCaseDetail(selectedProviderId, user!.orgId) : null;
 
   return (
     <>

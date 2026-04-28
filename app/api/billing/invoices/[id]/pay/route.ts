@@ -1,26 +1,23 @@
 import { NextResponse } from "next/server";
 import { processInvoicePayment, getInvoiceById } from "@/lib/billing";
-import { getSessionUser } from "@/lib/auth";
+import { withAuthParams } from "@/lib/route-guard";
 
-export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getSessionUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+export const POST = withAuthParams(
+  async (_request, params, user) => {
+    const id = (await params).id as string;
 
-  const { id } = await params;
+    const invoice = await getInvoiceById(id, user.orgId);
+    if (!invoice) {
+      return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+    }
 
-  const invoice = await getInvoiceById(id, user.orgId);
-  if (!invoice) {
-    return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
-  }
+    const result = await processInvoicePayment(id);
 
-  const result = await processInvoicePayment(id);
+    if (!result.success) {
+      const status = result.error === "Invoice not found" ? 404 : 400;
+      return NextResponse.json({ error: result.error }, { status });
+    }
 
-  if (!result.success) {
-    const status = result.error === "Invoice not found" ? 404 : 400;
-    return NextResponse.json({ error: result.error }, { status });
-  }
-
-  return NextResponse.json({ success: true, paymentIntentId: result.paymentIntentId });
-}
+    return NextResponse.json({ success: true, paymentIntentId: result.paymentIntentId });
+  },
+);

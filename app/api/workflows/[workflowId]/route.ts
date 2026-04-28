@@ -1,32 +1,26 @@
 import { NextResponse } from "next/server";
-import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getWorkflowState } from "@/lib/workflow/read";
 import { inferType } from "@/lib/workflow/definitions";
 import type { WorkflowType } from "@/lib/workflow/types";
+import { withAuthParams } from "@/lib/route-guard";
 
-export async function GET(
-  _request: Request,
-  { params }: { params: Promise<{ workflowId: string }> },
-) {
-  const user = await getSessionUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+export const GET = withAuthParams(
+  async (_request, params, user) => {
+    const workflowId = (await params).workflowId as string;
+    const allowed = await isOrgAuthorized(workflowId, user.orgId);
+    if (!allowed) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
 
-  const { workflowId } = await params;
-  const allowed = await isOrgAuthorized(workflowId, user.orgId);
-  if (!allowed) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-
-  try {
-    const state = await getWorkflowState(workflowId);
-    return NextResponse.json(state);
-  } catch {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-}
+    try {
+      const state = await getWorkflowState(workflowId);
+      return NextResponse.json(state);
+    } catch {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+  },
+);
 
 // Verify the workflow's parent entity belongs to the caller's org.
 // Mirrors the orgId checks in lib/credentialing.ts, lib/licenses.ts,

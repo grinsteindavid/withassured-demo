@@ -114,8 +114,7 @@ Workflows are database-backed using a Prisma `Workflow` table and the Vercel Wor
 - Replace `lib/workflow/*.ts` with the real Vercel Workflow SDK runtime; keep `derive.ts` and `types.ts`.
 - Replace `lib/stripe-mock.ts` with the real `stripe` SDK; `lib/billing.ts` hooks already call into it.
 - Add Auth.js / Clerk if SSO is needed; migrate JWT cookie verify in `middleware.ts`.
-- Add Sentry, OpenTelemetry, rate limiting (e.g. `@upstash/ratelimit`).
-- Add audit log table + middleware.
+- Add Sentry, OpenTelemetry.
 - HIPAA: BAA with hosting + DB provider, PHI encryption, access reviews.
 - CI: typecheck, lint, `prisma validate`, `bun test`, Playwright e2e.
 

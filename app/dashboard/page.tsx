@@ -1,21 +1,15 @@
 import { getDashboardMetrics } from "@/lib/enrollment";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { redirect } from "next/navigation";
 
 export default async function DashboardOverview() {
   const user = await getSessionUser();
-
-  if (!user) {
-    redirect("/login");
-  }
-
   const org = await prisma.organization.findUnique({
-    where: { id: user.orgId },
+    where: { id: user!.orgId },
     select: { name: true },
   });
 
-  const { totalProviders, activeCredentials, pendingEnrollments, complianceAlerts, expiredLicenses } = await getDashboardMetrics(user.orgId);
+  const { totalProviders, activeCredentials, pendingEnrollments, complianceAlerts, expiredLicenses } = await getDashboardMetrics(user!.orgId);
 
   return (
     <div>

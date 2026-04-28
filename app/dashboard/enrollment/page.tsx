@@ -1,7 +1,6 @@
 import { listPayerEnrollments, listProviders } from "@/lib/enrollment";
 import { getSessionUser } from "@/lib/auth";
 import { getSubscription } from "@/lib/payments";
-import { redirect } from "next/navigation";
 import { DataTable } from "@/components/dashboard/data-table";
 import { EnrollmentRow } from "@/components/dashboard/enrollment/enrollment-row";
 import { WorkflowHeartbeat } from "@/components/dashboard/workflow-heartbeat";
@@ -10,14 +9,10 @@ import { AddPayerEnrollmentDialog } from "@/components/dashboard/enrollment/add-
 export default async function EnrollmentPage() {
   const user = await getSessionUser();
 
-  if (!user) {
-    redirect("/login");
-  }
-
   const [enrollments, providers, subscription] = await Promise.all([
-    listPayerEnrollments(user.orgId),
-    listProviders(user.orgId),
-    getSubscription(user.orgId),
+    listPayerEnrollments(user!.orgId),
+    listProviders(user!.orgId),
+    getSubscription(user!.orgId),
   ]);
   const providerMap = new Map(providers.map((p) => [p.id, p.name] as [string, string]));
 

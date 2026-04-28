@@ -1,20 +1,9 @@
 import { NextResponse } from "next/server";
 import { listProviders, createProviderWithLicenseAndCredentialing } from "@/lib/providers";
 import { createProviderSchema, providerQuerySchema } from "@/lib/validators";
-import { getSessionUser } from "@/lib/auth";
-import { requireActiveSubscription, subscriptionBlockedResponse } from "@/lib/subscription-guard";
+import { withSubscription } from "@/lib/route-guard";
 
-export async function GET(request: Request) {
-  const user = await getSessionUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const hasSubscription = await requireActiveSubscription(user.orgId);
-  if (!hasSubscription) {
-    return subscriptionBlockedResponse();
-  }
-
+export const GET = withSubscription(async (request, user) => {
   const { searchParams } = new URL(request.url);
   const result = providerQuerySchema.safeParse(Object.fromEntries(searchParams));
 
@@ -24,19 +13,9 @@ export async function GET(request: Request) {
 
   const providers = await listProviders(user.orgId, result.data);
   return NextResponse.json(providers);
-}
+});
 
-export async function POST(request: Request) {
-  const user = await getSessionUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const hasSubscription = await requireActiveSubscription(user.orgId);
-  if (!hasSubscription) {
-    return subscriptionBlockedResponse();
-  }
-
+export const POST = withSubscription(async (request, user) => {
   const body = await request.json();
   const result = createProviderSchema.safeParse(body);
 
@@ -46,4 +25,4 @@ export async function POST(request: Request) {
 
   const provider = await createProviderWithLicenseAndCredentialing(result.data, user.orgId);
   return NextResponse.json(provider, { status: 201 });
-}
+});

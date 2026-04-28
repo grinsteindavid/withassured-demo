@@ -166,3 +166,55 @@ describe("getSessionUser", () => {
     expect(result).toBeNull();
   });
 });
+
+describe("requireAuth", () => {
+  it("returns user when session is valid", async () => {
+    const payload = { sub: "user-123", orgId: "org-456", role: "ADMIN" };
+    const token = await signJWT(payload);
+    cookiesMock.mockResolvedValueOnce({
+      get: mock((name: string) => (name === "session" ? { value: token } : undefined)),
+    });
+
+    const { requireAuth } = await import("./auth");
+    const result = await requireAuth();
+
+    expect(result.userId).toBe("user-123");
+    expect(result.orgId).toBe("org-456");
+    expect(result.role).toBe("ADMIN");
+  });
+
+  it("throws when no session exists", async () => {
+    cookiesMock.mockResolvedValueOnce({
+      get: mock(() => undefined),
+    });
+
+    const { requireAuth } = await import("./auth");
+    expect(() => requireAuth()).toThrow();
+  });
+});
+
+describe("requireRole", () => {
+  it("returns user when role is allowed", async () => {
+    const payload = { sub: "user-123", orgId: "org-456", role: "ADMIN" };
+    const token = await signJWT(payload);
+    cookiesMock.mockResolvedValueOnce({
+      get: mock((name: string) => (name === "session" ? { value: token } : undefined)),
+    });
+
+    const { requireRole } = await import("./auth");
+    const result = await requireRole(["ADMIN"]);
+
+    expect(result.role).toBe("ADMIN");
+  });
+
+  it("throws when role is not allowed", async () => {
+    const payload = { sub: "user-123", orgId: "org-456", role: "MEMBER" };
+    const token = await signJWT(payload);
+    cookiesMock.mockResolvedValueOnce({
+      get: mock((name: string) => (name === "session" ? { value: token } : undefined)),
+    });
+
+    const { requireRole } = await import("./auth");
+    expect(() => requireRole(["ADMIN"])).toThrow();
+  });
+});

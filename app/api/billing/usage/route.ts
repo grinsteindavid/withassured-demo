@@ -1,14 +1,9 @@
 import { NextResponse } from "next/server";
 import { getCurrentUsage } from "@/lib/billing";
-import { getSessionUser } from "@/lib/auth";
 import { billingUsageQuerySchema } from "@/lib/validators";
+import { withAuth } from "@/lib/route-guard";
 
-export async function GET(request: Request) {
-  const user = await getSessionUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
+export const GET = withAuth(async (request, user) => {
   const { searchParams } = new URL(request.url);
   const result = billingUsageQuerySchema.safeParse(Object.fromEntries(searchParams));
 
@@ -18,4 +13,4 @@ export async function GET(request: Request) {
 
   const usage = await getCurrentUsage(result.data.period, user.orgId);
   return NextResponse.json(usage);
-}
+});
