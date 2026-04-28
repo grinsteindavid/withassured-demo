@@ -26,6 +26,10 @@ type TemporalState = {
 // Singleton — same globalThis trick as lib/db.ts so state survives Next.js dev hot-reload.
 const globalForTemporal = globalThis as unknown as {
   temporalState?: TemporalState;
+  temporalCallbacks?: {
+    onComplete: ((workflowId: string) => void) | null;
+    onFail: ((workflowId: string, reason: string) => void) | null;
+  };
 };
 
 const state: TemporalState = globalForTemporal.temporalState ?? {
@@ -33,6 +37,13 @@ const state: TemporalState = globalForTemporal.temporalState ?? {
   timers: new Map(),
   autoPlayEnabled: false,
 };
+
+if (!globalForTemporal.temporalCallbacks) {
+  globalForTemporal.temporalCallbacks = {
+    onComplete: null,
+    onFail: null,
+  };
+}
 
 if (process.env.NODE_ENV !== "production") globalForTemporal.temporalState = state;
 
@@ -136,8 +147,18 @@ function cancelAutoTick(workflowId: string): void {
 }
 
 export const controls = {
-  onComplete: null as ((workflowId: string) => void) | null,
-  onFail: null as ((workflowId: string, reason: string) => void) | null,
+  get onComplete() {
+    return globalForTemporal.temporalCallbacks!.onComplete;
+  },
+  set onComplete(fn) {
+    globalForTemporal.temporalCallbacks!.onComplete = fn;
+  },
+  get onFail() {
+    return globalForTemporal.temporalCallbacks!.onFail;
+  },
+  set onFail(fn) {
+    globalForTemporal.temporalCallbacks!.onFail = fn;
+  },
 
   advance(workflowId: string): void {
     const workflow = ensure(workflowId);
@@ -186,6 +207,11 @@ export const controls = {
       if (process.env.NODE_ENV !== "production") {
         console.log(`[workflow] ${workflowId} completed`);
       }
+      if (!controls.onComplete) {
+        console.warn(
+          `[workflow] ${workflowId} completed but onComplete is null — DB sync may be broken (did registerDbSync run?)`,
+        );
+      }
       controls.onComplete?.(workflowId);
     }
   },
@@ -216,6 +242,11 @@ export const controls = {
     workflow.closeTime = now;
     if (process.env.NODE_ENV !== "production") {
       console.log(`[workflow] ${workflowId} failed: ${reason}`);
+    }
+    if (!controls.onFail) {
+      console.warn(
+        `[workflow] ${workflowId} failed but onFail is null — DB sync may be broken (did registerDbSync run?)`,
+      );
     }
     controls.onFail?.(workflowId, reason);
   },

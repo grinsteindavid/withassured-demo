@@ -56,8 +56,8 @@ export async function getInvoiceById(id: string, orgId: string) {
 
 export async function recordUsageEvent(
   type: UsageType,
+  orgId: string,
   providerId?: string,
-  orgId = "org_1",
 ) {
   const unitCents = unitCentsFor(type);
 

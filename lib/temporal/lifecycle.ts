@@ -1,7 +1,7 @@
 import "server-only";
 
 import { prisma } from "@/lib/db";
-import { controls } from "./client";
+import { controls, mockTemporal } from "./client";
 import { WORKFLOW_DEFINITIONS, inferType } from "./fixtures";
 import { recomputeAndUpdateProviderStatus } from "@/lib/providers";
 
@@ -33,18 +33,32 @@ async function recomputeForWorkflow(workflowId: string) {
 }
 
 export function registerDbSync() {
+  console.log("[workflow] Registering DB sync callbacks");
+
   controls.onComplete = async (workflowId) => {
+    console.log(`[workflow] onComplete fired for ${workflowId}`);
+    // Verify workflow is actually COMPLETED before updating DB
+    const handle = mockTemporal.workflow.getHandle(workflowId);
+    const info = await handle.describe();
+
+    if (info.status.name !== "COMPLETED") {
+      console.warn(
+        `[workflow] ${workflowId} callback triggered but status is ${info.status.name}, skipping DB update`,
+      );
+      return;
+    }
+
     console.log(`[workflow] ${workflowId} sync → DB updated to COMPLETED/APPROVED/ACTIVE`);
     await Promise.all([
       prisma.credentialingCase
         .updateMany({ where: { workflowId, status: "IN_PROGRESS" }, data: { status: "COMPLETED" } })
-        .catch(() => {}),
+        .catch((err) => console.error(`[workflow] Failed to update credentialing case for ${workflowId}:`, err)),
       prisma.payerEnrollment
         .updateMany({ where: { workflowId, status: "PENDING" }, data: { status: "APPROVED" } })
-        .catch(() => {}),
+        .catch((err) => console.error(`[workflow] Failed to update enrollment for ${workflowId}:`, err)),
       prisma.license
-        .updateMany({ where: { workflowId, status: "PENDING" }, data: { status: "ACTIVE" } })
-        .catch(() => {}),
+        .updateMany({ where: { workflowId }, data: { status: "ACTIVE" } })
+        .catch((err) => console.error(`[workflow] Failed to update license status for ${workflowId}:`, err)),
     ]);
 
     // Handle compliance workflow completion - check result and revoke if FLAG
@@ -56,7 +70,7 @@ export function registerDbSync() {
       if (check && check.result === "FLAG") {
         await prisma.license
           .updateMany({ where: { providerId: check.providerId, status: "ACTIVE" }, data: { status: "REVOKED" } })
-          .catch(() => {});
+          .catch((err) => console.error(`[workflow] Failed to revoke license for ${workflowId}:`, err));
         console.log(`[compliance] License revoked for provider ${check.providerId} (FLAG result found)`);
       }
     }
@@ -65,17 +79,29 @@ export function registerDbSync() {
   };
 
   controls.onFail = async (workflowId, reason: string) => {
+    console.log(`[workflow] onFail fired for ${workflowId}: ${reason}`);
+    // Verify workflow is actually FAILED before updating DB
+    const handle = mockTemporal.workflow.getHandle(workflowId);
+    const info = await handle.describe();
+
+    if (info.status.name !== "FAILED") {
+      console.warn(
+        `[workflow] ${workflowId} fail callback triggered but status is ${info.status.name}, skipping DB update`,
+      );
+      return;
+    }
+
     console.log(`[workflow] ${workflowId} sync → DB updated to FAILED/DENIED/REVOKED (${reason})`);
     await Promise.all([
       prisma.credentialingCase
         .updateMany({ where: { workflowId, status: "IN_PROGRESS" }, data: { status: "FAILED" } })
-        .catch(() => {}),
+        .catch((err) => console.error(`[workflow] Failed to update credentialing case for ${workflowId}:`, err)),
       prisma.payerEnrollment
         .updateMany({ where: { workflowId, status: "PENDING" }, data: { status: "DENIED" } })
-        .catch(() => {}),
+        .catch((err) => console.error(`[workflow] Failed to update enrollment for ${workflowId}:`, err)),
       prisma.license
-        .updateMany({ where: { workflowId, status: "PENDING" }, data: { status: "REVOKED" } })
-        .catch(() => {}),
+        .updateMany({ where: { workflowId }, data: { status: "REVOKED" } })
+        .catch((err) => console.error(`[workflow] Failed to update license status for ${workflowId}:`, err)),
     ]);
 
     // Handle compliance workflow failure - revoke license and update check result
@@ -87,10 +113,10 @@ export function registerDbSync() {
       if (check) {
         await prisma.license
           .updateMany({ where: { providerId: check.providerId, status: "ACTIVE" }, data: { status: "REVOKED" } })
-          .catch(() => {});
+          .catch((err) => console.error(`[workflow] Failed to revoke license for ${workflowId}:`, err));
         await prisma.complianceCheck
           .update({ where: { id: checkId }, data: { result: "FLAG" } })
-          .catch(() => {});
+          .catch((err) => console.error(`[workflow] Failed to update compliance check for ${workflowId}:`, err));
         console.log(`[compliance] License revoked and check result set to FLAG for provider ${check.providerId}`);
       }
     }

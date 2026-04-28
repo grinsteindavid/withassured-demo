@@ -29,8 +29,8 @@ export async function recomputeAndUpdateProviderStatus(providerId: string): Prom
   return status;
 }
 
-export async function getProviders() {
-  return prisma.provider.findMany();
+export async function getProviders(orgId: string) {
+  return prisma.provider.findMany({ where: { orgId } });
 }
 
 export async function listProviders(
@@ -121,13 +121,16 @@ export async function getProviderDetail(
 }
 
 export async function createProvider(data: z.infer<typeof createProviderSchema>) {
+  if (!data.orgId) {
+    throw new Error("orgId is required");
+  }
   return prisma.provider.create({
     data: {
       npi: data.npi,
       name: data.name,
       specialty: data.specialty,
       status: data.status,
-      orgId: data.orgId || "",
+      orgId: data.orgId,
     },
   });
 }
@@ -174,8 +177,8 @@ export async function createProviderWithLicenseAndCredentialing(
   });
 
   await Promise.all([
-    recordUsageEvent("LICENSE", result.provider.id, orgId),
-    recordUsageEvent("CREDENTIALING", result.provider.id, orgId),
+    recordUsageEvent("LICENSE", orgId, result.provider.id),
+    recordUsageEvent("CREDENTIALING", orgId, result.provider.id),
   ]);
 
   controls.create(result.license.workflowId!, { status: "RUNNING", completedCount: 0 });

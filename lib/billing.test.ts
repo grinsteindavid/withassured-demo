@@ -154,7 +154,7 @@ describe("listAllInvoices", () => {
 describe("recordUsageEvent", () => {
   it("creates a usage event with the right unitCents and emits a meter event", async () => {
     usageEventCreate.mockClear();
-    const event = await recordUsageEvent("CREDENTIALING", "p_1");
+    const event = await recordUsageEvent("CREDENTIALING", "org_1", "p_1");
     expect(usageEventCreate).toHaveBeenCalledWith({
       data: { orgId: "org_1", type: "CREDENTIALING", providerId: "p_1", unitCents: 19_900 },
     });
@@ -170,22 +170,15 @@ describe("recordUsageEvent", () => {
     ];
     for (const [type, expected] of cases) {
       usageEventCreate.mockClear();
-      await recordUsageEvent(type as "LICENSE" | "ENROLLMENT" | "MONITORING");
+      await recordUsageEvent(type as "LICENSE" | "ENROLLMENT" | "MONITORING", "org_1");
       const call = usageEventCreate.mock.calls[0][0] as { data: { unitCents: number } };
       expect(call.data.unitCents).toBe(expected);
     }
   });
 
-  it("uses default orgId when omitted", async () => {
-    usageEventCreate.mockClear();
-    await recordUsageEvent("MONITORING");
-    const call = usageEventCreate.mock.calls[0][0] as { data: { orgId: string } };
-    expect(call.data.orgId).toBe("org_1");
-  });
-
   it("works without providerId", async () => {
     usageEventCreate.mockClear();
-    const event = await recordUsageEvent("LICENSE");
+    const event = await recordUsageEvent("LICENSE", "org_1");
     const call = usageEventCreate.mock.calls[0][0] as { data: { providerId?: string } };
     expect(call.data.providerId).toBeUndefined();
     expect(event.type).toBe("LICENSE");

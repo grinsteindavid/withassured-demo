@@ -58,10 +58,10 @@ const { computeProviderStatus } = await import("./providers-shared");
 const { getProviders, listProviders, getProviderDetail, createProvider, createProviderWithLicenseAndCredentialing, recomputeAndUpdateProviderStatus } = await import("./providers");
 
 describe("getProviders", () => {
-  it("returns all providers", async () => {
+  it("returns providers scoped to orgId", async () => {
     findMany.mockClear();
-    const providers = await getProviders();
-    expect(findMany).toHaveBeenCalled();
+    const providers = await getProviders("org_1");
+    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { orgId: "org_1" } }));
     expect(Array.isArray(providers)).toBe(true);
     expect(providers[0].id).toBe("p_1");
   });
@@ -356,6 +356,20 @@ describe("createProvider", () => {
       orgId: "org-test-123",
     }));
   });
+
+  it("throws when orgId is missing", async () => {
+    const data = {
+      npi: "1234567890",
+      name: "Dr. Test",
+      specialty: "Cardiology",
+      status: "ACTIVE" as const,
+      orgId: "",
+      licenseState: "CA",
+      licenseNumber: "L000000",
+      licenseExpiresAt: "2027-01-01",
+    };
+    await expect(createProvider(data)).rejects.toThrow("orgId is required");
+  });
 });
 
 describe("createProviderWithLicenseAndCredentialing", () => {
@@ -445,8 +459,8 @@ describe("createProviderWithLicenseAndCredentialing", () => {
     await createProviderWithLicenseAndCredentialing(data, "org_1");
 
     expect(recordUsageEventMock).toHaveBeenCalledTimes(2);
-    expect(recordUsageEventMock).toHaveBeenCalledWith("LICENSE", "p_new", "org_1");
-    expect(recordUsageEventMock).toHaveBeenCalledWith("CREDENTIALING", "p_new", "org_1");
+    expect(recordUsageEventMock).toHaveBeenCalledWith("LICENSE", "org_1", "p_new");
+    expect(recordUsageEventMock).toHaveBeenCalledWith("CREDENTIALING", "org_1", "p_new");
   });
 
   it("creates temporal workflows for license and credentialing", async () => {
