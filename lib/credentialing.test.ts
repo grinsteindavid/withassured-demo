@@ -1,11 +1,27 @@
-import { describe, it, expect, mock, beforeEach } from "bun:test";
-import { controls } from "@/lib/temporal/client";
+import { describe, it, expect, mock } from "bun:test";
 
 const findMany = mock(async (_args: unknown) => [] as unknown[]);
 const findUnique = mock(async (_args: unknown) => null as unknown);
+const workflowFindUnique = mock(async () => ({
+  id: "cred_test",
+  type: "credentialing",
+  status: "RUNNING",
+  steps: [
+    { name: "APPLICATION_RECEIVED", status: "COMPLETED", at: "2026-04-27T00:00:00Z" },
+    { name: "PSV_EDUCATION", status: "COMPLETED", at: "2026-04-27T00:00:00Z" },
+    { name: "PSV_DEA", status: "COMPLETED", at: "2026-04-27T00:00:00Z" },
+    { name: "SANCTIONS_CHECK", status: "RUNNING", at: "2026-04-27T00:00:00Z" },
+    { name: "COMMITTEE_REVIEW", status: "PENDING" },
+    { name: "APPROVED", status: "PENDING" },
+  ],
+  startedAt: new Date(),
+  runId: null,
+  closedAt: null,
+  updatedAt: new Date(),
+}));
 
 mock.module("@/lib/db", () => ({
-  prisma: { provider: { findMany, findUnique } },
+  prisma: { provider: { findMany, findUnique }, workflow: { findUnique: workflowFindUnique } },
 }));
 
 const { listCredentialingCases, getCredentialingCaseDetail } = await import("./credentialing");
@@ -20,29 +36,23 @@ const fakeProvider = (over: Partial<{ id: string; name: string; specialty: strin
   credentialingCase: {
     id: "cc_1",
     providerId: over.id ?? "p_1",
-    workflowId: over.workflowId ?? "cred_p1",
+    workflowId: over.workflowId ?? "cred_test",
     status: "IN_PROGRESS",
   },
-});
-
-beforeEach(() => {
-  controls.reset();
-  findMany.mockReset();
-  findUnique.mockReset();
 });
 
 describe("listCredentialingCases", () => {
   it("returns one summary per provider with an attached case, with derived currentStep", async () => {
     findMany.mockResolvedValueOnce([
-      fakeProvider({ id: "p_1", name: "Dr. Alice", workflowId: "cred_alice" }),
-      fakeProvider({ id: "p_2", name: "Dr. Bob", workflowId: "cred_bob" }),
+      fakeProvider({ id: "p_1", name: "Dr. Alice", workflowId: "cred_test" }),
+      fakeProvider({ id: "p_2", name: "Dr. Bob", workflowId: "cred_test" }),
     ]);
 
     const cases = await listCredentialingCases("org_test");
 
     expect(cases).toHaveLength(2);
     expect(cases[0].providerName).toBe("Dr. Alice");
-    expect(cases[0].workflowId).toBe("cred_alice");
+    expect(cases[0].workflowId).toBe("cred_test");
     expect(cases[0].status).toBe("RUNNING");
     expect(cases[0].currentStep).toBe("SANCTIONS_CHECK");
   });
@@ -56,28 +66,17 @@ describe("listCredentialingCases", () => {
       orderBy: { name: "asc" },
     });
   });
-
-  it("reflects state changes after controls.advance()", async () => {
-    findMany.mockResolvedValueOnce([fakeProvider({ workflowId: "cred_advance_test" })]);
-    await listCredentialingCases("org_test");
-
-    controls.advance("cred_advance_test");
-
-    findMany.mockResolvedValueOnce([fakeProvider({ workflowId: "cred_advance_test" })]);
-    const after = await listCredentialingCases("org_test");
-    expect(after[0].currentStep).toBe("COMMITTEE_REVIEW");
-  });
 });
 
 describe("getCredentialingCaseDetail", () => {
   it("returns full detail with steps when the provider has a case", async () => {
-    findUnique.mockResolvedValueOnce(fakeProvider({ id: "p_42", workflowId: "cred_42" }));
+    findUnique.mockResolvedValueOnce(fakeProvider({ id: "p_42", workflowId: "cred_test" }));
 
     const detail = await getCredentialingCaseDetail("p_42", "org_test");
 
     expect(detail).not.toBeNull();
     expect(detail!.providerId).toBe("p_42");
-    expect(detail!.workflowId).toBe("cred_42");
+    expect(detail!.workflowId).toBe("cred_test");
     expect(detail!.steps.map((s) => `${s.name}:${s.status}`)).toEqual([
       "APPLICATION_RECEIVED:COMPLETED",
       "PSV_EDUCATION:COMPLETED",

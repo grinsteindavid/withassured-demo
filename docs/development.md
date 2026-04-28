@@ -72,7 +72,7 @@ Mock workflow events log with prefixes:
 - `[compliance] comp_<id> reconciled to COMPLETED (DB: CLEAN)`
 - `[compliance] Scheduler started (60s interval)`
 
-These come from `lib/temporal/client.ts` and `lib/temporal/lifecycle.ts`.
+These come from `lib/workflow/store.ts` and `lib/workflow/compliance.ts`.
 
 ### Database
 

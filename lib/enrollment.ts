@@ -1,7 +1,9 @@
 import "server-only";
 
 import { prisma } from "@/lib/db";
-import { controls } from "@/lib/temporal/client";
+import { start } from "workflow/api";
+import { enrollmentWorkflow } from "@/lib/workflow/enrollment";
+import { seedWorkflowRow } from "@/lib/workflow/store";
 import type { createPayerEnrollmentSchema } from "@/lib/validators";
 import type { z } from "zod";
 
@@ -77,7 +79,11 @@ export async function createPayerEnrollment(
     data: { workflowId },
   });
 
-  controls.create(workflowId, { status: "RUNNING", completedCount: 0 });
+  // Pre-seed Workflow row before start() so the dashboard can read it
+  // immediately, even before the SDK drains its execution queue.
+  await seedWorkflowRow(prisma, workflowId, "enrollment");
+
+  await start(enrollmentWorkflow, [workflowId]);
 
   return prisma.payerEnrollment.findUnique({ where: { id: enrollment.id } });
 }

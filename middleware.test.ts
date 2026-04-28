@@ -1,6 +1,6 @@
 import { describe, it, expect } from "bun:test";
 import { NextRequest } from "next/server";
-import { middleware } from "./middleware";
+import { middleware, config } from "./middleware";
 
 describe("middleware", () => {
   it("allows /login through without a session", async () => {
@@ -47,5 +47,17 @@ describe("middleware", () => {
     const response = await middleware(request);
     expect(response.status).toBe(307);
     expect(response.headers.get("location")).toBe("http://localhost:3000/login");
+  });
+
+  describe("matcher config", () => {
+    it("excludes Workflow SDK runtime endpoints", () => {
+      const matcher = config.matcher[0];
+      expect(matcher).toContain(".well-known/workflow/");
+    });
+
+    it("excludes cron routes (gated by Bearer token, not session)", () => {
+      const matcher = config.matcher[0];
+      expect(matcher).toContain("api/cron/");
+    });
   });
 });

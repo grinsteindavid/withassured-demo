@@ -71,4 +71,4 @@ docker compose down -v           # also wipes the postgres volume (full reset)
 
 - `docs/development.md` — daily dev loop, Bun/Node runtime split, debugging.
 - `docs/data-model.md` — what the seed creates and how auth works.
-- `docs/temporal-mock.md` — how the workflow mock advances and reconciles.
+- `docs/workflows.md` — Vercel Workflow SDK setup, step functions, and cron configuration.

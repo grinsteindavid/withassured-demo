@@ -35,6 +35,7 @@ Every owned model has `orgId` + `onDelete: Cascade` for tenant cleanup.
 | `PayerEnrollment` | `providerId`, `payer`, `state`, `status: EnrollmentStatus`, `submittedAt?`, `workflowId?`; `@@unique([providerId, payer, state])` |
 | `ComplianceCheck` | `providerId`, `source`, `result`, `checkedAt` |
 | `CredentialingCase` | `providerId` @unique, `workflowId` @unique, `status: CaseStatus` |
+| `Workflow` | `id` @unique (also used as `workflowId`), `runId`, `type`, `status`, `steps: Json`, `startedAt`, `closedAt`, `updatedAt` |
 | `BillingPlan` | `orgId` @unique, `platformFeeCents`, `unitPrice{Credentialing,License,Enrollment,Monitoring}` |
 | `UsageEvent` | `orgId`, `type: UsageType`, `providerId?`, `unitCents`, `occurredAt`, `invoiceId?` |
 | `Invoice` | `orgId`, `periodStart/End`, `subtotalCents`, `totalCents`, `status: InvoiceStatus`, `lineItems: Json` |
@@ -78,9 +79,9 @@ Creates:
 - One admin user: `admin@assured.test` / `password123` (bcrypt-hashed, role `ADMIN`).
 - One `BillingPlan` with prices listed in `docs/billing.md`.
 - Two providers: Dr. Sarah Johnson (Primary Care) and Dr. Michael Chen (Cardiology).
-- Licenses, payer enrollments, compliance checks, and credentialing cases for both providers — referenced by `workflowId` prefixes (`cred_`, `lic_`, `enr_`) so the mock infers type from the id.
+- One `Invoice` to show billing data.
 
-The lifecycle hooks in `app/layout.tsx` then reconcile the in-memory mock against these rows on startup.
+The seed is intentionally minimal — providers, licenses, enrollments, compliance checks, and credentialing cases are created via the app UI or cron. The `Workflow` table is the source of truth for workflow step state; the Vercel Workflow SDK writes to it during execution.
 
 ## Prisma client singleton
 

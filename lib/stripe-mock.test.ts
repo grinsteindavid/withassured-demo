@@ -208,7 +208,7 @@ describe("syncStripeMockFromDB", () => {
     await syncStripeMockFromDB(mockPrisma);
     console.log("[stripe-mock.test] syncStripeMockFromDB resolved");
 
-    const methods = listPaymentMethods("org_1");
+    const methods = await listPaymentMethods("org_1");
     console.log("[stripe-mock.test] listPaymentMethods returned", methods.length, "items");
     expect(methods).toHaveLength(1);
     expect(methods[0].id).toBe("pm_mock_123");
@@ -237,7 +237,7 @@ describe("syncStripeMockFromDB", () => {
     await syncStripeMockFromDB(mockPrisma);
     console.log("[stripe-mock.test] syncStripeMockFromDB resolved");
 
-    const subscription = getSubscription("org_1");
+    const subscription = await getSubscription("org_1");
     console.log("[stripe-mock.test] getSubscription returned", subscription ? subscription.id : "undefined");
     expect(subscription).toBeDefined();
     expect(subscription?.id).toBe("sub_db_1");
@@ -303,7 +303,7 @@ describe("syncStripeMockFromDB", () => {
     await syncStripeMockFromDB(mockPrisma);
     console.log("[stripe-mock.test] syncStripeMockFromDB resolved");
 
-    const methods = listPaymentMethods("org_1");
+    const methods = await listPaymentMethods("org_1");
     console.log("[stripe-mock.test] listPaymentMethods returned", methods.length, "items");
     expect(methods[0].type).toBe("card"); // CARD → card
 
@@ -322,8 +322,8 @@ describe("syncStripeMockFromDB", () => {
 
     await syncStripeMockFromDB(mockPrisma);
 
-    expect(listPaymentMethods("org_1")).toHaveLength(0);
-    expect(getSubscription("org_1")).toBeUndefined();
+    expect(await listPaymentMethods("org_1")).toHaveLength(0);
+    expect(await getSubscription("org_1")).toBeUndefined();
     expect(listInvoices("org_1")).toHaveLength(0);
     console.log("[stripe-mock.test] TEST: handles empty DB — PASS");
   });
@@ -357,7 +357,7 @@ describe("Post-Sync Functionality", () => {
     await syncStripeMockFromDB(mockPrisma);
     console.log("[stripe-mock.test] syncStripeMockFromDB resolved");
 
-    const methods = listPaymentMethods("org_1");
+    const methods = await listPaymentMethods("org_1");
     console.log("[stripe-mock.test] listPaymentMethods returned", methods.length, "items");
     expect(methods).toHaveLength(1);
     expect(methods[0].id).toBe("pm_mock_123");

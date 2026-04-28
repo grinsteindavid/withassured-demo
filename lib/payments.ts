@@ -54,7 +54,7 @@ export async function listPaymentMethods(orgId: string): Promise<PaymentMethodDe
     orderBy: { createdAt: "desc" },
   });
 
-  const stripeMethods = stripeListPaymentMethods(orgId);
+  const stripeMethods = await stripeListPaymentMethods(orgId);
 
   // Merge DB references with Stripe details
   const methods = dbMethods
@@ -118,7 +118,7 @@ export async function getSubscription(orgId: string): Promise<Subscription | nul
 
   if (!dbSubscription) return null;
 
-  const stripeSubscription = stripeGetSubscription(orgId);
+  const stripeSubscription = await stripeGetSubscription(orgId);
   if (!stripeSubscription) return null;
 
   return {
@@ -142,7 +142,7 @@ export async function createSubscription(
     const periodEnd = new Date(now);
     periodEnd.setMonth(periodEnd.getMonth() + 1);
 
-    const stripeSub = stripeUpdateSubscription({
+    const stripeSub = await stripeUpdateSubscription({
       customerId: orgId,
       plan,
       status: "ACTIVE",
@@ -197,7 +197,7 @@ export async function cancelSubscription(orgId: string): Promise<Subscription | 
   if (!dbSubscription) return null;
 
   // Cancel in Stripe mock
-  const stripeSubscription = stripeCancelSubscription(orgId);
+  const stripeSubscription = await stripeCancelSubscription(orgId);
   if (!stripeSubscription) return null;
 
   // Update in DB - immediate cancellation

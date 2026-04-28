@@ -11,8 +11,9 @@ const providerFindFirst = mock(async () => ({ id: "prov_1", orgId: "org_test" })
 const credentialingCaseCount = mock(async () => 0);
 const complianceCheckCount = mock(async () => 0);
 const licenseCount = mock(async () => 0);
+const workflowUpsert = mock(async ({ create }: { create: { id: string; type: string; status: string; steps: unknown } }) => create);
 
-const controlsCreate = mock(() => {});
+const startMock = mock(async () => ({ runId: "run_test" }));
 
 mock.module("@/lib/db", () => ({
   prisma: {
@@ -27,14 +28,12 @@ mock.module("@/lib/db", () => ({
     credentialingCase: { count: credentialingCaseCount },
     complianceCheck: { count: complianceCheckCount },
     license: { count: licenseCount },
+    workflow: { upsert: workflowUpsert },
   },
 }));
 
-import * as temporalClient from "@/lib/temporal/client";
-
-mock.module("@/lib/temporal/client", () => ({
-  ...temporalClient,
-  controls: { ...temporalClient.controls, create: controlsCreate },
+mock.module("workflow/api", () => ({
+  start: startMock,
 }));
 
 const { listPayerEnrollments, listProviders, getDashboardMetrics, createPayerEnrollment } = await import("./enrollment");
@@ -82,7 +81,7 @@ describe("createPayerEnrollment", () => {
   it("creates enrollment and spawns workflow", async () => {
     payerEnrollmentCreate.mockClear();
     payerEnrollmentUpdate.mockClear();
-    controlsCreate.mockClear();
+    startMock.mockClear();
 
     const data = {
       providerId: "prov_1",
@@ -106,11 +105,33 @@ describe("createPayerEnrollment", () => {
       where: { id: "enr_new" },
       data: { workflowId: "enr_enr_new" },
     });
-    expect(controlsCreate).toHaveBeenCalledWith("enr_enr_new", {
-      status: "RUNNING",
-      completedCount: 0,
-    });
+    expect(startMock).toHaveBeenCalledTimes(1);
     expect(result).toBeTruthy();
+  });
+
+  it("pre-seeds the Workflow row before starting the workflow", async () => {
+    workflowUpsert.mockClear();
+    startMock.mockClear();
+
+    const data = {
+      providerId: "prov_1",
+      payer: "Aetna",
+      state: "NY",
+    };
+
+    await createPayerEnrollment(data, "org_test");
+
+    expect(workflowUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "enr_enr_new" },
+        create: expect.objectContaining({ id: "enr_enr_new", type: "enrollment", status: "RUNNING" }),
+      }),
+    );
+    expect(workflowUpsert).toHaveBeenCalledTimes(1);
+    // upsert must happen before start() so the dashboard read can never race ahead.
+    expect(workflowUpsert.mock.invocationCallOrder[0]).toBeLessThan(
+      startMock.mock.invocationCallOrder[0],
+    );
   });
 
   it("throws when provider not found", async () => {

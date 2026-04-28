@@ -22,7 +22,7 @@ Assured is an **AI-powered operations platform for healthcare provider networks*
 3. **Payer Enrollment** — Automated submissions to any payer in any state, with follow-up tracking. ~30% faster in-network.
 4. **Network Management** — Continuous monitoring across 2,000+ sources; sanctions and expiration alerts.
 
-Each product is a long-running **workflow** (hence Temporal.io): days-to-weeks, many async steps, retries, human approvals, external portal submissions.
+Each product is a long-running **workflow** (backed by Vercel Workflows): days-to-weeks, many async steps, retries, human approvals, external portal submissions.
 
 ## Revenue model
 
@@ -37,7 +37,7 @@ Their public ROI claims ($4,200–$5,800 saved per provider/yr, $7,200 revenue r
 **Why they can charge premium:**
 - **NCQA CVO certification** — regulatory prerequisite for delegated credentialing contracts with payers. Few competitors have it.
 - **Primary-source integration breadth** — 2,000+ sources is a moat built over time.
-- **Workflow automation** — Temporal-backed pipelines reduce their own COGS, expanding margin.
+- **Workflow automation** — Vercel Workflow-backed pipelines reduce their own COGS, expanding margin.
 
 ## Competitive landscape
 
@@ -53,7 +53,7 @@ The withassured.com site has dedicated `/alternative/<competitor>` landing pages
 
 - NCQA CVO certification.
 - Depth and breadth of primary-source integrations.
-- Workflow orchestration (Temporal) reducing per-transaction cost.
+- Workflow orchestration (Vercel Workflows) reducing per-transaction cost.
 - Data network effects: more providers monitored → better anomaly detection → better SLA claims.
 - Founding story: built by Dawn Health operators who lived the pain.
 

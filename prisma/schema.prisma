@@ -235,3 +235,14 @@ model Subscription {
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 }
+
+model Workflow {
+  id        String    @id
+  runId     String?   @unique
+  type      String
+  status    String
+  steps     Json
+  startedAt DateTime  @default(now())
+  closedAt  DateTime?
+  updatedAt DateTime  @updatedAt
+}

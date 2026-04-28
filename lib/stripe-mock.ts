@@ -90,6 +90,21 @@ console.log(
   state.invoices.size,
 );
 
+let hydrationPromise: Promise<void> | null = null;
+
+export async function ensureStripeMockHydrated(): Promise<void> {
+  if (hydrationPromise) return hydrationPromise;
+  if (
+    state.paymentMethods.size > 0 ||
+    state.subscriptions.size > 0 ||
+    state.invoices.size > 0
+  ) {
+    return;
+  }
+  hydrationPromise = syncStripeMockFromDB().catch(() => {});
+  return hydrationPromise;
+}
+
 export function createInvoice(params: {
   customerId: string;
   lines: StripeInvoiceLine[];
@@ -191,6 +206,7 @@ export function resetMockState(): void {
   state.eventCounter = 0;
   state.paymentMethodCounter = 0;
   state.subscriptionCounter = 0;
+  hydrationPromise = null;
   console.log("[stripe-mock] resetMockState done. AFTER clear — all Maps empty.");
 }
 
@@ -231,7 +247,8 @@ export function createPaymentMethod(params: {
   return paymentMethod;
 }
 
-export function listPaymentMethods(customerId: string): PaymentMethodDetails[] {
+export async function listPaymentMethods(customerId: string): Promise<PaymentMethodDetails[]> {
+  await ensureStripeMockHydrated();
   const all = Array.from(state.paymentMethods.values());
   const result = all.filter((pm) => pm.customer === customerId);
   console.log(
@@ -298,7 +315,8 @@ export function createSubscription(params: {
   return subscription;
 }
 
-export function getSubscription(customerId: string): Subscription | undefined {
+export async function getSubscription(customerId: string): Promise<Subscription | undefined> {
+  await ensureStripeMockHydrated();
   const all = Array.from(state.subscriptions.values());
   const result = all.find((sub) => sub.customer === customerId);
   console.log(
@@ -313,8 +331,8 @@ export function getSubscription(customerId: string): Subscription | undefined {
   return result;
 }
 
-export function cancelSubscription(customerId: string): Subscription | null {
-  const subscription = getSubscription(customerId);
+export async function cancelSubscription(customerId: string): Promise<Subscription | null> {
+  const subscription = await getSubscription(customerId);
   if (!subscription) return null;
 
   subscription.status = "CANCELED";
@@ -322,14 +340,14 @@ export function cancelSubscription(customerId: string): Subscription | null {
   return subscription;
 }
 
-export function updateSubscription(params: {
+export async function updateSubscription(params: {
   customerId: string;
   plan: "STARTUP" | "GROWTH" | "ENTERPRISE";
   status?: "ACTIVE" | "PAST_DUE" | "CANCELED" | "TRIALING";
   currentPeriodStart?: string;
   currentPeriodEnd?: string;
-}): Subscription | null {
-  const subscription = getSubscription(params.customerId);
+}): Promise<Subscription | null> {
+  const subscription = await getSubscription(params.customerId);
   if (!subscription) return null;
 
   subscription.plan = params.plan;

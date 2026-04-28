@@ -1,9 +1,8 @@
 import "server-only";
 
 import { prisma } from "@/lib/db";
-import { mockTemporal } from "@/lib/temporal/client";
-import { currentStep, fullStepList } from "@/lib/temporal/derive";
-import type { WorkflowStep } from "@/lib/temporal/types";
+import { getWorkflowState } from "@/lib/workflow/read";
+import type { WorkflowStep } from "@/lib/workflow/types";
 import type { LicenseStatus, Provider } from "@prisma/client";
 
 type LicenseWithProvider = {
@@ -77,8 +76,7 @@ export async function listLicenses(
 
   return Promise.all(
     (licenses as LicenseWithProvider[]).map(async (license) => {
-      const handle = mockTemporal.workflow.getHandle(license.workflowId!);
-      const [info, history] = await Promise.all([handle.describe(), handle.fetchHistory()]);
+      const state = await getWorkflowState(license.workflowId!);
       return {
         id: license.id,
         providerId: license.providerId,
@@ -89,9 +87,9 @@ export async function listLicenses(
         expiresAt: license.expiresAt,
         status: license.status,
         workflowId: license.workflowId!,
-        workflowStatus: info.status.name,
-        currentStep: currentStep(history.events),
-        startTime: info.startTime,
+        workflowStatus: state.status,
+        currentStep: state.currentStep,
+        startTime: state.startTime,
       };
     }),
   );
@@ -110,8 +108,7 @@ export async function getLicenseDetail(
   const licenseWithProvider = license as LicenseWithProvider;
   if (licenseWithProvider.provider.orgId !== orgId) return null;
 
-  const handle = mockTemporal.workflow.getHandle(license.workflowId);
-  const [info, history] = await Promise.all([handle.describe(), handle.fetchHistory()]);
+  const state = await getWorkflowState(license.workflowId);
 
   return {
     id: license.id,
@@ -123,10 +120,10 @@ export async function getLicenseDetail(
     expiresAt: license.expiresAt,
     status: license.status,
     workflowId: license.workflowId,
-    workflowStatus: info.status.name,
-    currentStep: currentStep(history.events),
-    startTime: info.startTime,
-    steps: fullStepList(history.events, info.type),
+    workflowStatus: state.status,
+    currentStep: state.currentStep,
+    startTime: state.startTime,
+    steps: state.steps,
   };
 }
 

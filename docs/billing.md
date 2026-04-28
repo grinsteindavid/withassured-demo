@@ -19,7 +19,7 @@ Hard-coded in `lib/billing.ts:4-10` (`PRICING`) and seeded into `BillingPlan` fo
 ```
 Mock workflow completes
   │
-  ▼  controls.onComplete(workflowId)        (registered in lib/temporal/lifecycle.ts)
+  ▼  controls.onComplete(workflowId)        (registered in lib/workflow/store.ts)
   │
   ▼  POST /api/billing/events { type, providerId? }
   │     │

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { WorkflowTimeline } from "@/components/dashboard/workflow-timeline";
 import { StatusBadge } from "@/components/dashboard/status-badge";
 import { formatDate } from "@/lib/format";
-import type { WorkflowStep } from "@/lib/temporal/types";
+import type { WorkflowStep } from "@/lib/workflow/types";
 
 interface Enrollment {
   id: string;

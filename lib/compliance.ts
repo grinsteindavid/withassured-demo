@@ -1,9 +1,8 @@
 import "server-only";
 
 import { prisma } from "@/lib/db";
-import { mockTemporal } from "@/lib/temporal/client";
-import { currentStep, fullStepList } from "@/lib/temporal/derive";
-import type { WorkflowStep } from "@/lib/temporal/types";
+import { getWorkflowState } from "@/lib/workflow/read";
+import type { WorkflowStep } from "@/lib/workflow/types";
 import type { Provider } from "@prisma/client";
 
 export async function getProvidersByOrg(orgId: string) {
@@ -85,8 +84,7 @@ export async function listComplianceWorkflows(
   return Promise.all(
     (checks as ComplianceCheckWithProvider[]).map(async (check) => {
       const workflowId = `comp_${check.id}`;
-      const handle = mockTemporal.workflow.getHandle(workflowId);
-      const [info, history] = await Promise.all([handle.describe(), handle.fetchHistory()]);
+      const state = await getWorkflowState(workflowId);
       return {
         id: check.id,
         providerId: check.providerId,
@@ -96,9 +94,9 @@ export async function listComplianceWorkflows(
         result: check.result,
         checkedAt: check.checkedAt,
         workflowId,
-        workflowStatus: info.status.name,
-        currentStep: currentStep(history.events),
-        startTime: info.startTime,
+        workflowStatus: state.status,
+        currentStep: state.currentStep,
+        startTime: state.startTime,
       };
     }),
   );
@@ -118,8 +116,7 @@ export async function getComplianceWorkflowDetail(
   if (checkWithProvider.provider.orgId !== orgId) return null;
 
   const workflowId = `comp_${check.id}`;
-  const handle = mockTemporal.workflow.getHandle(workflowId);
-  const [info, history] = await Promise.all([handle.describe(), handle.fetchHistory()]);
+  const state = await getWorkflowState(workflowId);
 
   return {
     id: check.id,
@@ -130,9 +127,9 @@ export async function getComplianceWorkflowDetail(
     result: check.result,
     checkedAt: check.checkedAt,
     workflowId,
-    workflowStatus: info.status.name,
-    currentStep: currentStep(history.events),
-    startTime: info.startTime,
-    steps: fullStepList(history.events, info.type),
+    workflowStatus: state.status,
+    currentStep: state.currentStep,
+    startTime: state.startTime,
+    steps: state.steps,
   };
 }

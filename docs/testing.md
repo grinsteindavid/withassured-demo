@@ -41,7 +41,7 @@ Tests are colocated with source as `*.test.ts` / `*.test.tsx`. Current coverage:
 | **Lib utils** | Pricing math, JWT sign/verify, period math, validators. | `lib/billing.test.ts`, `lib/auth.test.ts`, `lib/validators.test.ts` |
 | **Domain modules** | Compliance, credentialing, enrollment, licenses, providers, workflows. | `lib/compliance.test.ts`, `lib/credentialing.test.ts`, `lib/enrollment.test.ts`, `lib/licenses.test.ts`, `lib/providers.test.ts`, `lib/workflows.test.ts` |
 | **Stripe mock** | Invoice + meter event semantics. | `lib/stripe-mock.test.ts` |
-| **Temporal mock** | Client surface, derive reducer, lifecycle scheduler. | `lib/temporal/client.test.ts`, `lib/temporal/derive.test.ts`, `lib/temporal/lifecycle.test.ts` |
+| **Workflows** | Vercel Workflow SDK steps, engine, and read paths. | `lib/workflows.test.ts`, `lib/credentialing.test.ts`, `lib/enrollment.test.ts` |
 | **Middleware** | JWT cookie pass-through / redirect. | `middleware.test.ts` |
 | **Components** | RTL render + DOM assertions. | `components/dashboard/workflow-timeline.test.tsx`, `components/dashboard/billing/*.test.tsx`, `components/dashboard/enrollment/enrollment-row.test.tsx`, `components/dashboard/logout-button.test.tsx` |
 | **Pages** | Smoke render of dashboard overview. | `app/dashboard/page.test.tsx` |
@@ -56,7 +56,7 @@ Tests are colocated with source as `*.test.ts` / `*.test.tsx`. Current coverage:
   const { GET } = await import("./route");
   ```
 - **`fetch` / network** — `spyOn(globalThis, "fetch")`.
-- **Time / `setInterval`** — `spyOn(globalThis, "setInterval")` and assert callback registration; see `lib/temporal/lifecycle.test.ts` for the pattern.
+- **Time / `setInterval`** — `spyOn(globalThis, "setInterval")` and assert callback registration.
 - **Fixtures** — `test/fixtures/index.ts` exports `makeProvider`, `makeWorkflow`, `makeInvoice`. Builders take overrides.
 
 ### Cross-file `mock.module` pitfalls (Bun 1.3.x)
@@ -72,10 +72,10 @@ Bun's `mock.module(specifier, factory)` registers process-wide. The registration
 - **Use the real module directly** when the test-only override would just re-implement the real behavior. Call the real `resetMockState()` in `beforeEach` for isolation. Example: `lib/billing.test.ts` imports `createInvoice`, `payInvoice`, etc. straight from `@/lib/stripe-mock`.
 - **If you must `mock.module` an alias**, spread the real module first so every export stays defined:
   ```ts
-  import * as temporalClient from "@/lib/temporal/client";
-  mock.module("@/lib/temporal/client", () => ({
-    ...temporalClient,
-    controls: { ...temporalClient.controls, create: controlsCreateMock },
+  import * as workflowApi from "workflow/api";
+  mock.module("workflow/api", () => ({
+    ...workflowApi,
+    start: startMock,
   }));
   ```
   See `lib/providers.test.ts` for a working example. Never register a `mock.module` factory that returns a partial subset of a module also imported elsewhere in the suite.

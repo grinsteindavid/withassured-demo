@@ -1,4 +1,4 @@
-import { WorkflowStep } from "@/lib/temporal/types";
+import { WorkflowStep } from "@/lib/workflow/types";
 import { formatDateTime } from "@/lib/format";
 
 interface WorkflowTimelineProps {

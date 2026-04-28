@@ -1,9 +1,8 @@
 import "server-only";
 
 import { prisma } from "@/lib/db";
-import { mockTemporal } from "@/lib/temporal/client";
-import { currentStep, fullStepList } from "@/lib/temporal/derive";
-import type { WorkflowStep } from "@/lib/temporal/types";
+import { getWorkflowState } from "@/lib/workflow/read";
+import type { WorkflowStep } from "@/lib/workflow/types";
 
 export type CredentialingCaseSummary = {
   providerId: string;
@@ -33,17 +32,16 @@ export async function listCredentialingCases(orgId: string): Promise<Credentiali
   return Promise.all(
     providers.map(async (p) => {
       const workflowId = p.credentialingCase!.workflowId;
-      const handle = mockTemporal.workflow.getHandle(workflowId);
-      const [info, history] = await Promise.all([handle.describe(), handle.fetchHistory()]);
+      const state = await getWorkflowState(workflowId);
       return {
         providerId: p.id,
         providerName: p.name,
         specialty: p.specialty,
         npi: p.npi,
         workflowId,
-        status: info.status.name,
-        currentStep: currentStep(history.events),
-        startTime: info.startTime,
+        status: state.status,
+        currentStep: state.currentStep,
+        startTime: state.startTime,
       };
     }),
   );
@@ -61,8 +59,7 @@ export async function getCredentialingCaseDetail(
   if (provider.orgId !== orgId) return null;
 
   const workflowId = provider.credentialingCase.workflowId;
-  const handle = mockTemporal.workflow.getHandle(workflowId);
-  const [info, history] = await Promise.all([handle.describe(), handle.fetchHistory()]);
+  const state = await getWorkflowState(workflowId);
 
   return {
     providerId: provider.id,
@@ -70,9 +67,9 @@ export async function getCredentialingCaseDetail(
     specialty: provider.specialty,
     npi: provider.npi,
     workflowId,
-    status: info.status.name,
-    currentStep: currentStep(history.events),
-    startTime: info.startTime,
-    steps: fullStepList(history.events, info.type),
+    status: state.status,
+    currentStep: state.currentStep,
+    startTime: state.startTime,
+    steps: state.steps,
   };
 }

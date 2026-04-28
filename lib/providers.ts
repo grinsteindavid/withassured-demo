@@ -11,7 +11,10 @@ import {
   type ProviderWithRelations,
 } from "@/lib/providers-shared";
 import { recordUsageEvent } from "@/lib/billing";
-import { controls } from "@/lib/temporal/client";
+import { start } from "workflow/api";
+import { credentialingWorkflow } from "@/lib/workflow/credentialing";
+import { licenseWorkflow } from "@/lib/workflow/license";
+import { seedWorkflowRow } from "@/lib/workflow/store";
 
 export { computeProviderStatus };
 export type { ProviderDetail, ProviderSummary };
@@ -173,6 +176,12 @@ export async function createProviderWithLicenseAndCredentialing(
       },
     });
 
+    // Pre-seed Workflow rows inside the same transaction so the UI never
+    // sees a missing row during the SDK queue-drain window. ensureRunStep
+    // inside the workflow body becomes a no-op for existing rows.
+    await seedWorkflowRow(tx, `cred_${provider.id}`, "credentialing");
+    await seedWorkflowRow(tx, `lic_${license.id}`, "license");
+
     return { provider, license: licenseWithWorkflow, credentialingCase };
   });
 
@@ -181,8 +190,8 @@ export async function createProviderWithLicenseAndCredentialing(
     recordUsageEvent("CREDENTIALING", orgId, result.provider.id),
   ]);
 
-  controls.create(result.license.workflowId!, { status: "RUNNING", completedCount: 0 });
-  controls.create(`cred_${result.provider.id}`, { status: "RUNNING", completedCount: 0 });
+  await start(credentialingWorkflow, [`cred_${result.provider.id}`]);
+  await start(licenseWorkflow, [result.license.workflowId!]);
 
   return result.provider;
 }

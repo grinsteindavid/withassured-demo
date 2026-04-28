@@ -12,17 +12,17 @@ How the pieces fit together, the seams designed for production swap-in, and what
 │           │                            │                         │
 │           │                            ├──▶ Prisma ──▶ Postgres  │
 │           │                            │                         │
-│           │                            └──▶ lib/temporal/*       │
-│           │                                 (in-process mock)    │
+│           │                            └──▶ lib/workflow/*       │
+│           │                                 (Vercel Workflows)   │
 │           │                                                      │
 │           └──▶ middleware.ts (JWT cookie auth)                   │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
 - **Frontend + backend in one repo** via the Next.js App Router.
-- **Temporal is an in-process mock** (`lib/temporal/`) that mirrors the `@temporalio/client` surface. No worker runs. See `docs/temporal-mock.md`.
+- **Vercel Workflows** (`lib/workflow/`) run via Next.js API routes using the Vercel Workflow SDK (`'use workflow'` / `'use step'`). A cron job advances compliance checks. See `docs/workflows.md`.
 - **Postgres** stores providers, licenses, enrollments, compliance events, billing data, payment methods, subscriptions.
-- **Bootstrap hooks** in `app/layout.tsx` register DB-sync callbacks, run reconciliation, and start the compliance scheduler at module load.
+- **Bootstrap hooks** in `app/layout.tsx` are minimal — no workflow side effects at module load.
 
 ## Tech stack
 
@@ -32,7 +32,7 @@ How the pieces fit together, the seams designed for production swap-in, and what
 | **Bun + Node hybrid runtime** | Bun for installs, tests, Prisma CLI, seeds; Node for `next dev` (works around `vercel/next.js#86866`). See `docs/development.md`. |
 | **Prisma 5.22 + PostgreSQL 16** | Strong types, migrations, wide team familiarity. |
 | **JWT + HTTP-only cookie auth** | Hand-rolled (`jose` + `bcryptjs`); edge-compatible. No third-party. |
-| **Temporal-shaped mock** | Mirrors `@temporalio/client` so a real worker is a single-file swap. |
+| **Vercel Workflows** | Database-backed via Prisma `Workflow` table; Vercel Workflow SDK for execution. |
 | **Tailwind v4 + shadcn/ui + lucide-react** | Credible dashboard UI fast; accessible primitives. |
 | **Zod** | Input validation on every Route Handler. |
 | **Bun test + Playwright** | Native Bun runner for unit/component, Playwright for e2e. |
@@ -54,7 +54,7 @@ app/
 │   ├── layout.tsx                # sidebar nav
 │   ├── page.tsx                  # overview
 │   ├── billing/, compliance/, credentialing/, enrollment/, licensing/, roster/
-└── layout.tsx                    # root: registerDbSync(), reconcileAll(), startComplianceScheduler()
+└── layout.tsx                    # root layout
 components/
 ├── ui/                           # shadcn primitives (10 files)
 └── dashboard/
@@ -64,7 +64,7 @@ components/
 lib/
 ├── auth.ts                       # jose + bcryptjs + cookie helpers
 ├── db.ts                         # Prisma client singleton
-├── temporal/                     # mock: client, fixtures, derive, lifecycle, types
+├── workflow/                     # Vercel Workflow SDK functions + Prisma store/read
 ├── billing.ts                    # PRICING, rollupUsage, usage/invoice queries
 ├── stripe-mock.ts                # Stripe-shaped invoice + meter-event primitives
 ├── compliance.ts, credentialing.ts, enrollment.ts, licenses.ts, providers.ts, workflows.ts
@@ -93,26 +93,25 @@ Every external system has a single file you'd swap for production:
 
 | Seam | File | Production swap |
 |---|---|---|
-| Workflow orchestration | `lib/temporal/client.ts` | `@temporalio/client` — `types.ts`, `derive.ts`, `lifecycle.ts` keep working |
+| Workflow orchestration | `lib/workflow/*.ts` | Vercel Workflow SDK — `store.ts`, `read.ts`, `definitions.ts` keep working |
 | Billing primitives | `lib/stripe-mock.ts` | `stripe` SDK — same `createInvoice` / `createMeterEvent` shape |
 | Auth | `lib/auth.ts` | Auth.js / Clerk — middleware contract stays |
 | Database | `lib/db.ts` | Already Prisma; switch `DATABASE_URL` |
 
-`<WorkflowTimeline>` (`components/dashboard/workflow-timeline.tsx`) renders any workflow type from a derived `WorkflowStep[]` (see `lib/temporal/derive.ts`). The reducer is the same code you'd write against real Temporal history events.
+`<WorkflowTimeline>` (`components/dashboard/workflow-timeline.tsx`) renders any workflow type from a derived `WorkflowStep[]` (see `lib/workflow/derive.ts`). The reducer is the same code you'd write against real workflow history events.
 
-## Bootstrap order
+## Workflow architecture
 
-`app/layout.tsx:3-7` runs at module load on the server:
+Workflows are database-backed using a Prisma `Workflow` table and the Vercel Workflow SDK.
 
-1. `registerDbSync()` — wires `controls.onComplete` / `controls.onFail` to update Postgres when mock workflows finish.
-2. `reconcileAll()` — at startup, walks DB rows for credentialing cases, enrollments, licenses, compliance checks, and seeds the in-memory mock to match.
-3. `startComplianceScheduler()` — every 60 s, scans providers with ACTIVE licenses and creates a new compliance workflow.
-
-In production, all three are skipped (`process.env.NODE_ENV === "production"` guards).
+1. **Creation** — business logic (`lib/providers.ts`, `lib/enrollment.ts`) calls `start(workflowFn, [workflowId])` when a provider/enrollment is created. The workflow function (`'use workflow'`) calls `ensureRun()` to create a `Workflow` row.
+2. **Execution** — steps are `'use step'` functions that write to the `Workflow` row (mark step as `RUNNING` → `COMPLETED`).
+3. **Compliance** — Vercel Cron (`*/5 * * * *`) hits `GET /api/cron/compliance`, which creates new `ComplianceCheck` rows and starts compliance workflows.
+4. **Reads** — UI pages call `getWorkflowState()` which queries the `Workflow` table and derives `WorkflowStep[]` for `<WorkflowTimeline>`.
 
 ## Productionization checklist
 
-- Replace `lib/temporal/client.ts` with `@temporalio/client`; keep `derive.ts` and `types.ts`.
+- Replace `lib/workflow/*.ts` with the real Vercel Workflow SDK runtime; keep `derive.ts` and `types.ts`.
 - Replace `lib/stripe-mock.ts` with the real `stripe` SDK; `lib/billing.ts` hooks already call into it.
 - Add Auth.js / Clerk if SSO is needed; migrate JWT cookie verify in `middleware.ts`.
 - Add Sentry, OpenTelemetry, rate limiting (e.g. `@upstash/ratelimit`).
@@ -122,7 +121,7 @@ In production, all three are skipped (`process.env.NODE_ENV === "production"` gu
 
 ## Intentionally out of scope
 
-- Real Temporal worker + activities.
+- Real Vercel Workflow SDK deployment tuning (local dev handles most).
 - Real Stripe / payment provider.
 - RBAC beyond a single role field (`ADMIN | MEMBER`).
 - File uploads (credentialing attachments).

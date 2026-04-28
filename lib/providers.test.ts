@@ -1,5 +1,6 @@
 import { describe, it, expect, mock } from "bun:test";
 
+const workflowUpsert = mock(async ({ create }: { create: { id: string; type: string; status: string; steps: unknown } }) => create);
 const findMany = mock(async () => [
   { id: "p_1", npi: "1234567890", name: "Dr. Mock", specialty: "Cardiology", status: "ACTIVE", orgId: "org_1" },
 ]);
@@ -22,22 +23,24 @@ const licenseCreate = mock(async ({ data }: { data: Record<string, unknown> }) =
 const licenseUpdate = mock(async ({ where, data }: { where: { id: string }; data: Record<string, unknown> }) => ({ id: where.id, ...data }));
 const credentialingCaseCreate = mock(async ({ data }: { data: Record<string, unknown> }) => ({ id: "c_new", ...data }));
 const recordUsageEventMock = mock(async () => ({ id: "ue_1" }));
-const controlsCreateMock = mock(() => ({}));
 
 mock.module("@/lib/db", () => ({
   prisma: {
     provider: { findMany, findUnique, create, update },
     license: { create: licenseCreate, update: licenseUpdate },
     credentialingCase: { create: credentialingCaseCreate },
+    workflow: { upsert: workflowUpsert },
     $transaction: mock(async (fn: (tx: {
       provider: { create: typeof create };
       license: { create: typeof licenseCreate; update: typeof licenseUpdate };
       credentialingCase: { create: typeof credentialingCaseCreate };
+      workflow: { upsert: typeof workflowUpsert };
     }) => Promise<unknown>) => {
       return fn({
         provider: { create },
         license: { create: licenseCreate, update: licenseUpdate },
         credentialingCase: { create: credentialingCaseCreate },
+        workflow: { upsert: workflowUpsert },
       });
     }),
   },
@@ -47,11 +50,10 @@ mock.module("@/lib/billing", () => ({
   recordUsageEvent: recordUsageEventMock,
 }));
 
-import * as temporalClient from "@/lib/temporal/client";
+const startMock = mock(async () => ({ runId: "run_test" }));
 
-mock.module("@/lib/temporal/client", () => ({
-  ...temporalClient,
-  controls: { ...temporalClient.controls, create: controlsCreateMock },
+mock.module("workflow/api", () => ({
+  start: startMock,
 }));
 
 const { computeProviderStatus } = await import("./providers-shared");
@@ -463,8 +465,8 @@ describe("createProviderWithLicenseAndCredentialing", () => {
     expect(recordUsageEventMock).toHaveBeenCalledWith("CREDENTIALING", "org_1", "p_new");
   });
 
-  it("creates temporal workflows for license and credentialing", async () => {
-    controlsCreateMock.mockClear();
+  it("starts Vercel workflows for license and credentialing", async () => {
+    startMock.mockClear();
     const data = {
       npi: "1234567890",
       name: "Dr. Test",
@@ -477,14 +479,35 @@ describe("createProviderWithLicenseAndCredentialing", () => {
     };
     await createProviderWithLicenseAndCredentialing(data, "org_1");
 
-    expect(controlsCreateMock).toHaveBeenCalledTimes(2);
-    expect(controlsCreateMock).toHaveBeenCalledWith(
-      expect.stringMatching(/^lic_l_new$/),
-      { status: "RUNNING", completedCount: 0 },
+    expect(startMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("pre-seeds Workflow rows for credentialing and license inside the transaction", async () => {
+    workflowUpsert.mockClear();
+    const data = {
+      npi: "1234567890",
+      name: "Dr. Test",
+      specialty: "Cardiology",
+      status: "ACTIVE" as const,
+      orgId: "org-test-123",
+      licenseState: "NY",
+      licenseNumber: "L123456",
+      licenseExpiresAt: "2027-01-01",
+    };
+    await createProviderWithLicenseAndCredentialing(data, "org_1");
+
+    expect(workflowUpsert).toHaveBeenCalledTimes(2);
+    expect(workflowUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "cred_p_new" },
+        create: expect.objectContaining({ id: "cred_p_new", type: "credentialing", status: "RUNNING" }),
+      }),
     );
-    expect(controlsCreateMock).toHaveBeenCalledWith(
-      expect.stringMatching(/^cred_p_new$/),
-      { status: "RUNNING", completedCount: 0 },
+    expect(workflowUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "lic_l_new" },
+        create: expect.objectContaining({ id: "lic_l_new", type: "license", status: "RUNNING" }),
+      }),
     );
   });
 

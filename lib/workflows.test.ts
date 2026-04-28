@@ -1,18 +1,35 @@
-import { describe, it, expect, beforeEach } from "bun:test";
-import { controls } from "@/lib/temporal/client";
-import { getWorkflowState } from "./workflows";
+import { describe, it, expect, mock } from "bun:test";
 
-beforeEach(() => {
-  controls.reset();
-});
+const workflowFindUnique = mock(async () => ({
+  id: "cred_test",
+  type: "credentialing",
+  status: "RUNNING",
+  steps: [
+    { name: "APPLICATION_RECEIVED", status: "COMPLETED", at: "2026-04-27T00:00:00Z" },
+    { name: "PSV_EDUCATION", status: "COMPLETED", at: "2026-04-27T00:00:00Z" },
+    { name: "PSV_DEA", status: "COMPLETED", at: "2026-04-27T00:00:00Z" },
+    { name: "SANCTIONS_CHECK", status: "RUNNING", at: "2026-04-27T00:00:00Z" },
+    { name: "COMMITTEE_REVIEW", status: "PENDING" },
+    { name: "APPROVED", status: "PENDING" },
+  ],
+  startedAt: new Date(),
+  runId: null,
+  closedAt: null,
+  updatedAt: new Date(),
+}));
 
-const callGet = (workflowId: string) => getWorkflowState(workflowId);
+mock.module("@/lib/db", () => ({
+  prisma: { workflow: { findUnique: workflowFindUnique } },
+}));
+
+const { getWorkflowState } = await import("./workflows");
 
 describe("getWorkflowState", () => {
-  it("returns the seeded workflow shape for a credentialing id", async () => {
-    const data = await callGet("cred_a");
+  it("returns the workflow shape from the DB", async () => {
+    workflowFindUnique.mockClear();
+    const data = await getWorkflowState("cred_test");
 
-    expect(data.workflowId).toBe("cred_a");
+    expect(data.workflowId).toBe("cred_test");
     expect(data.type).toBe("credentialing");
     expect(data.status).toBe("RUNNING");
     expect(data.currentStep).toBe("SANCTIONS_CHECK");
@@ -26,15 +43,8 @@ describe("getWorkflowState", () => {
     ]);
   });
 
-  it("reflects state changes after controls.advance()", async () => {
-    await callGet("cred_b"); // seed
-    controls.advance("cred_b");
-
-    const data = await callGet("cred_b");
-    expect(data.currentStep).toBe("COMMITTEE_REVIEW");
-  });
-
   it("throws for unknown workflow id prefix", async () => {
-    await expect(callGet("zzz_unknown")).rejects.toThrow(/Unknown workflow type/);
+    workflowFindUnique.mockResolvedValueOnce(null as never);
+    await expect(getWorkflowState("zzz_unknown")).rejects.toThrow(/Workflow not found/);
   });
 });

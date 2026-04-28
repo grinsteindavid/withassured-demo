@@ -1,5 +1,4 @@
-// Types mirror @temporalio/client surface (a small subset).
-// When swapping to the real client, replace these imports with the SDK equivalents.
+// Types that model workflow execution and the UI step list.
 
 export type WorkflowExecutionStatus =
   | "RUNNING"
