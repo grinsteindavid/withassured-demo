@@ -30,61 +30,23 @@ services:
       timeout: 5s
       retries: 5
 
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    environment:
-      NODE_ENV: development
-      DATABASE_URL: postgresql://postgres:postgres@db:5432/assured
-      REDIS_URL: redis://redis:6379
-      JWT_SECRET: ${JWT_SECRET}
-
-      HOSTNAME: "0.0.0.0"
-      # macOS bind mounts don't fire inotify events — force polling so
-      # Next.js / Turbopack pick up host file changes inside the container.
-      WATCHPACK_POLLING: "true"
-      CHOKIDAR_USEPOLLING: "true"
-      CHOKIDAR_INTERVAL: "500"
-      CRON_SECRET: ${CRON_SECRET}
-    ports:
-      - "3000:3000"
-    volumes:
-      - .:/app
-      - /app/node_modules
-      - /app/.next
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f -H \"Authorization: Bearer $$CRON_SECRET\" http://localhost:3000/api/health || exit 1"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-      start_period: 15s
-    command: >
-      sh -c "bunx prisma generate &&
-             bunx prisma migrate deploy &&
-             bun run db:seed &&
-             exec node node_modules/next/dist/bin/next dev"
-
   cron:
     image: curlimages/curl:latest
     environment:
-      APP_URL: http://app:3000
+      # Cron always reaches the Next.js app on the host port 3000 via
+      # host.docker.internal — works whether the app runs in Docker or
+      # via `bun run dev` on the host.
+      APP_URL: ${APP_URL:-http://host.docker.internal:3000}
       ENDPOINT: /api/cron/compliance
       CRON_SECRET: ${CRON_SECRET}
-    depends_on:
-      app:
-        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     healthcheck:
       test: ["CMD-SHELL", "curl -f -H \"Authorization: Bearer $$CRON_SECRET\" $$APP_URL/api/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 10s
+      start_period: 30s
     command: >
       sh -c "while true; do
         echo \"=== \$(date -Iseconds) - Starting compliance check ===\";
@@ -92,24 +54,6 @@ services:
         echo \"=== \$(date -Iseconds) - Sleeping for 300 seconds ===\";
         sleep 300;
       done"
-
-  studio:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    environment:
-      DATABASE_URL: postgresql://postgres:postgres@db:5432/assured
-    ports:
-      - "5555:5555"
-    volumes:
-      - .:/app
-      - /app/node_modules
-      - /app/.next
-    depends_on:
-      db:
-        condition: service_healthy
-    command: >
-      sh -c "bunx prisma generate && bunx prisma studio --port 5555 --hostname 0.0.0.0"
 
 volumes:
   postgres_data:

@@ -8,7 +8,7 @@ export async function POST(request: Request) {
   try {
     const limitResult = await rateLimit(
       buildIdentifier({ bucket: "login", ip: clientIp }),
-      15,
+      60,
       60_000,
     );
     if (!limitResult.allowed) {

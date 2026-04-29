@@ -1,4 +1,7 @@
-import { describe, it, expect, mock, beforeEach } from "bun:test";
+import { describe, it, expect, mock, beforeEach, afterAll } from "bun:test";
+
+import * as RealAnalyticsSection from "@/components/dashboard/analytics/analytics-section";
+const realAnalyticsSection = { ...RealAnalyticsSection };
 
 const count = mock(async () => 0 as number);
 const verifyJWTMock = mock(async () => null as { sub: string; orgId: string; role: string } | null);
@@ -43,6 +46,12 @@ mock.module("next/navigation", () => ({
 mock.module("@/components/dashboard/analytics/analytics-section", () => ({
   AnalyticsSection: () => null,
 }));
+
+// Restore the real module after this file's tests so later test files
+// (e.g. analytics-section.test.tsx) see the real component.
+afterAll(() => {
+  mock.module("@/components/dashboard/analytics/analytics-section", () => realAnalyticsSection);
+});
 
 const { default: DashboardOverview } = await import("./page");
 

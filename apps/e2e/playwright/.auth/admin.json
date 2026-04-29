@@ -1,0 +1,25 @@
+{
+  "cookies": [
+    {
+      "name": "session",
+      "value": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjbW9qZ3p6eDQwMDAwODcza2E2OTUzNmZyIiwib3JnSWQiOiJvcmdfYWNtZV9oZWFsdGgiLCJyb2xlIjoiQURNSU4iLCJpYXQiOjE3Nzc0MzIxMzgsImV4cCI6MTc3NzQzNTczOH0.uJj8sxNh_nI3hPcjB21OPR8AB84GZ8S9tw9le1W4D_4",
+      "domain": "localhost",
+      "path": "/",
+      "expires": 1777435738.312,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "csrf-token",
+      "value": "324f5a03-de38-4c89-b9f5-44c6ed52b9c5",
+      "domain": "localhost",
+      "path": "/",
+      "expires": 1777435738.312,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    }
+  ],
+  "origins": []
+}

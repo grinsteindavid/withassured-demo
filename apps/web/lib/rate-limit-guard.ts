@@ -3,7 +3,7 @@ import { headers } from "next/headers";
 import { rateLimit, buildIdentifier, RateLimitUnavailableError } from "@/lib/rate-limit";
 import { getSessionUser } from "@/lib/auth";
 
-const DEFAULT_PAGE_RATE_LIMIT_MAX = 15;
+const DEFAULT_PAGE_RATE_LIMIT_MAX = 30;
 const DEFAULT_PAGE_RATE_LIMIT_WINDOW_MS = 60_000;
 
 export class RateLimitExceededError extends Error {

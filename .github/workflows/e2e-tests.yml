@@ -34,7 +34,7 @@ jobs:
         run: bunx playwright install --with-deps
 
       - name: Run Playwright
-        run: bunx playwright test
+        run: bun --cwd apps/e2e run test:e2e
         env:
           BASE_URL: ${{ steps.vercel.outputs.preview-url }}
           E2E_USER_EMAIL: ${{ secrets.E2E_USER_EMAIL }}

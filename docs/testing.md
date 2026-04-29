@@ -61,10 +61,26 @@ Tests are colocated with source as `*.test.ts` / `*.test.tsx`. Current coverage:
 
 ### Cross-file `mock.module` pitfalls (Bun 1.3.x)
 
-Bun's `mock.module(specifier, factory)` registers process-wide. The registration persists across test files and **whichever file's factory is registered first wins the module cache** for any later static import resolving to the same specifier. This causes two failure modes that are easy to hit and painful to debug:
+Bun's `mock.module(specifier, factory)` registers process-wide. The registration persists across test files and **whichever file's factory is registered first wins the module cache** for any later static import resolving to the same specifier. This causes three failure modes that are easy to hit and painful to debug:
 
 1. **Partial mock corrupts another file's static imports.** If `a.test.ts` does `mock.module("@/lib/foo", () => ({ bar: mockBar }))` and `b.test.ts` does `import { bar, baz } from "@/lib/foo"`, then `b.test.ts` fails at module evaluation with `SyntaxError: Export named 'baz' not found`. We hit this with `@/lib/stripe-mock` — see the inline comment in `lib/billing.test.ts`.
 2. **Mocked function identities leak into the file that tests the real module.** `lib/stripe-mock.test.ts` imports the real module statically; if `lib/billing.test.ts` had registered a partial mock first, the destructured bindings in `stripe-mock.test.ts` would be the mocked stubs, not the real implementations. `afterAll` cleanup does **not** save you — the next file's static imports are evaluated before the previous file's `afterAll` runs.
+3. **Whole-component stubs leak into the file that tests that component.** A consumer test mocks an entire component module to `() => null` (e.g. `app/dashboard/page.test.tsx` stubs `@/components/dashboard/analytics/analytics-section`). When `components/dashboard/analytics/analytics-section.test.tsx` later does `await import("./analytics-section")`, Bun returns the registered stub — the real component never runs and assertions on its inner calls fail silently. Unlike pitfall #2, **`afterAll` cleanup *does* fix this** because the affected test uses a dynamic `await import(...)`, so cleanup of the offending file runs before the next file's import is evaluated. See `app/dashboard/page.test.tsx` for the pattern:
+
+   ```ts
+   import * as RealAnalyticsSection from "@/components/dashboard/analytics/analytics-section";
+   const realAnalyticsSection = { ...RealAnalyticsSection };
+
+   mock.module("@/components/dashboard/analytics/analytics-section", () => ({
+     AnalyticsSection: () => null,
+   }));
+
+   afterAll(() => {
+     mock.module("@/components/dashboard/analytics/analytics-section", () => realAnalyticsSection);
+   });
+   ```
+
+   **Rule:** any test file that `mock.module`s a *component or module that has its own `*.test.tsx`* must capture the real exports before mocking and restore them in `afterAll`.
 
 **Rules of thumb:**
 
@@ -95,7 +111,7 @@ bun test middleware.test.ts # single file
 ### Layout
 
 ```
-e2e/
+apps/e2e/
 ├── globalSetup.ts          # logs in via /api/auth/login, persists cookies to playwright/.auth/admin.json
 ├── pages/
 │   ├── BasePage.ts
@@ -103,14 +119,16 @@ e2e/
 │   └── DashboardPage.ts    # page object pattern
 ├── fixtures/
 │   └── index.ts            # extends Playwright's `test` with loginPage / dashboardPage fixtures
-└── specs/
-    └── auth.e2e.ts         # auth flow specs
+├── specs/
+│   └── auth.e2e.ts         # auth flow specs
+├── playwright.config.ts    # Playwright configuration
+└── package.json            # e2e workspace manifest
 ```
 
 `playwright.config.ts` highlights:
 
-- `testDir: "./e2e"`, `testMatch: "**/*.e2e.ts"`.
-- `globalSetup: "./e2e/globalSetup.ts"` — runs once before any spec.
+- `testDir: "./specs"`, `testMatch: "**/*.e2e.ts"`.
+- `globalSetup: "./globalSetup.ts"` — runs once before any spec.
 - `use.storageState: "playwright/.auth/admin.json"` — every test starts authenticated; specs that need a fresh session call `test.use({ storageState: { cookies: [], origins: [] } })`.
 - `webServer.command: "bun dev"` — Playwright will start the dev server if not already running. (When running tests against the Docker stack, set `reuseExistingServer: true` and start `docker compose up app` first.)
 - Single project: `chromium` on `Desktop Chrome`.
@@ -129,9 +147,9 @@ These default values match what `prisma/seed.ts` creates.
 ### Commands
 
 ```bash
-bun run test:e2e            # headless run
-bun run test:e2e:ui         # Playwright UI mode
-bunx playwright test e2e/specs/auth.e2e.ts   # single spec
+bun run test:e2e                              # headless run (from root via turbo)
+bun --cwd apps/e2e run test:e2e:ui            # Playwright UI mode
+bunx --cwd apps/e2e playwright test specs/auth.e2e.ts   # single spec
 bunx playwright codegen http://localhost:3000   # record new specs
 ```
 
